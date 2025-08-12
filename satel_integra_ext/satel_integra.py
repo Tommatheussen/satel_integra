@@ -93,11 +93,11 @@ class SatelMessage(object):
                  outputs=None):
         self.cmd = cmd
         self.msg_data = msg_data if msg_data else bytearray()
-        if code:
+        if code is not None:
             self.msg_data += bytearray.fromhex(code.ljust(16, 'F'))
-        if partitions:
+        if partitions is not None:
             self.msg_data += partition_bytes(partitions, 4)
-        if outputs:
+        if outputs is not None:
             self.msg_data += partition_bytes(outputs, 32)
 
     def compare_cmd(self, other):
