@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "satel-integra"
+version = "0.0.0"
+description = "Communication library for Satel Integra alarm system (via TCP/IP protocol)"
+readme = "README.rst"
+keywords = ["satel", "integra", "alarm", "security"]
+authors = [
+  { name = "c-soft", email = "c-soft@users.noreply.github.com" },
+  { name = "Tom Matheussen", email = "13683094+Tommatheussen@users.noreply.github.com" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Security",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.8,<4.0"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "pytest-cov",
+  "flake8>=5.0",
+  "black",
+  "mypy",
+  "tox",
+  "pre-commit",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311"]
+skip-string-normalization = false
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+  "E203",  # black whitespace before “:”
+  "W503",  # line break before binary operator
+]
+exclude = [
+  ".venv",
+  "build",
+  "dist",
+  ".tox",
+  "__pycache__",
+]
+
+[tool.mypy]
+strict = true
+python_version = 3.10
+ignore_missing_imports = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "--cov=satel_integra --cov-report=term-missing -q"
+testpaths = ["tests"]
+
