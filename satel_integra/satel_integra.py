@@ -170,7 +170,7 @@ class AsyncSatel:
                 AlarmState.TRIGGERED_FIRE, msg
             ),
             SatelReadCommand.OUTPUTS_STATE: self._output_changed,
-            SatelReadCommand.ARMED_MODE1: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ARMED_MODE1: lambda msg: self._armed(
                 AlarmState.ARMED_MODE1, msg
             ),
             SatelReadCommand.RESULT: lambda msg: self._command_result(msg),
@@ -211,7 +211,7 @@ class AsyncSatel:
             _LOGGER.warning("Start monitoring - no data!")
             return
 
-        if int(resp[1:2]) != SatelResultCode.COMMAND_ACCEPTED:
+        if int.from_bytes(resp[1:2]) != SatelResultCode.COMMAND_ACCEPTED:
             _LOGGER.warning("Monitoring not accepted.")
 
     def _zone_violated(self, msg):
@@ -301,7 +301,7 @@ class AsyncSatel:
             code += "F"
 
         code_bytes = bytearray.fromhex(code)
-        mode_command = SatelWriteCommand.ARM_MODE_0 + mode
+        mode_command = SatelWriteCommand.PARTITIONS_ARM_MODE_0 + mode
         data = generate_query(
             mode_command.to_bytes(1, "big")
             + code_bytes
@@ -319,7 +319,7 @@ class AsyncSatel:
         code_bytes = bytearray.fromhex(code)
 
         data = generate_query(
-            SatelWriteCommand.DISARM.to_bytes(1, "big")
+            SatelWriteCommand.PARTITIONS_DISARM.to_bytes(1, "big")
             + code_bytes
             + partition_bytes(partition_list)
         )
@@ -335,7 +335,7 @@ class AsyncSatel:
         code_bytes = bytearray.fromhex(code)
 
         data = generate_query(
-            SatelWriteCommand.CLEAR_ALARM.to_bytes(1, "big")
+            SatelWriteCommand.PARTITIONS_CLEAR_ALARM.to_bytes(1, "big")
             + code_bytes
             + partition_bytes(partition_list)
         )
@@ -355,7 +355,7 @@ class AsyncSatel:
 
         code_bytes = bytearray.fromhex(code)
         mode_command = (
-            SatelWriteCommand.OUTPUT_ON if state else SatelWriteCommand.OUTPUT_OFF
+            SatelWriteCommand.OUTPUTS_ON if state else SatelWriteCommand.OUTPUTS_OFF
         )
         data = generate_query(
             mode_command.to_bytes(1, "big") + code_bytes + output_bytes(output_id)
@@ -420,8 +420,8 @@ class AsyncSatel:
                 self._alarm_status_callback()
             return
 
-        msg_id = resp[0:1]
-        str_msg_id = "".join(format(x, "02x") for x in msg_id)
+        msg_id = int.from_bytes(resp[0:1])
+        str_msg_id = "".join(format(x, "02x") for x in resp[0:1])
         if msg_id in self._message_handlers:
             _LOGGER.info("Calling handler for id: 0x%s", str_msg_id)
             self._message_handlers[msg_id](resp)
