@@ -9,14 +9,14 @@ description = "Communication library for Satel Integra alarm system (via TCP/IP 
 readme = "README.rst"
 keywords = ["satel", "integra", "alarm", "security"]
 authors = [
-  { name = "c-soft", email = "c-soft@users.noreply.github.com" },
+  { name = "Krzysztof Machelski", email = "krzysztof.machelski+pypi@gmail.com" },
   { name = "Tom Matheussen", email = "13683094+Tommatheussen@users.noreply.github.com" }
 ]
+license-files = ["LICENSE"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Topic :: Security",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
