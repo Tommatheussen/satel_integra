@@ -58,7 +58,7 @@ exclude = [
 
 [tool.mypy]
 strict = true
-python_version = 3.10
+python_version = 3.13
 ignore_missing_imports = true
 warn_unused_configs = true
 
