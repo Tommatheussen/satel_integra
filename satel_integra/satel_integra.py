@@ -1,25 +1,16 @@
 """Main module."""
 
 import asyncio
-from binascii import hexlify
 import logging
 from enum import Enum, unique
 from collections.abc import Callable
 
-from satel_integra.message import SatelBaseMessage, SatelReadMessage, SatelWriteMessage
+from satel_integra.message import SatelReadMessage, SatelWriteMessage
 from satel_integra.utils import bitmask_bytes_le
 
 from .command import SatelReadCommand, SatelResultCode, SatelWriteCommand
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def print_hex(data):
-    """Debugging method to print out frames in hex."""
-    hex_msg = ""
-    for c in data:
-        hex_msg += "\\x" + format(c, "02x")
-    _LOGGER.debug(hex_msg)
 
 
 def list_set_bits(r, expected_length):
@@ -120,7 +111,7 @@ class AsyncSatel:
             SatelReadCommand.PARTITIONS_ARMED_MODE1: lambda msg: self._armed(
                 AlarmState.ARMED_MODE1, msg
             ),
-            SatelReadCommand.RESULT: lambda msg: self._command_result(msg),
+            SatelReadCommand.RESULT: self._command_result,
         }
 
     @property
@@ -246,11 +237,9 @@ class AsyncSatel:
     #         _LOGGER.warning("Timeout waiting for response from Satel!")
     #     return self._command_status
 
-    async def _send_data(self, data):
-        _LOGGER.debug("-- Sending data --")
-        print_hex(data)
-        _LOGGER.debug("-- ------------- --")
-        _LOGGER.debug("Sending %d bytes...", len(data))
+    async def _send_data(self, msg: SatelWriteMessage):
+        data = msg.encode_frame()
+        _LOGGER.debug("-- Sending data: %s", data.hex())
 
         if not self._writer:
             _LOGGER.warning("Ignoring data because we're disconnected!")
@@ -331,7 +320,7 @@ class AsyncSatel:
 
         try:
             data = await self._reader.readuntil(b"\xfe\x0d")
-            _LOGGER.debug("-- Received frame  %s", hexlify(data))
+            _LOGGER.debug("-- Received frame %s", data.hex())
             return data
 
         except Exception as e:
@@ -371,7 +360,7 @@ class AsyncSatel:
                 self._alarm_status_callback()
             return
 
-        msg = SatelBaseMessage.decode_frame(resp)
+        msg = SatelReadMessage.decode_frame(resp)
 
         if msg and isinstance(msg, SatelReadMessage):
             _LOGGER.debug("Decoded message: %s", msg)
