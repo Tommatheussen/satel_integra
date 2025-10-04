@@ -1,4 +1,4 @@
-from satel_integra.utils import bitmask_bytes_le, checksum
+from satel_integra.utils import checksum, decode_bitmask_le, encode_bitmask_le
 
 
 def test_checksum_known_value() -> None:
@@ -10,9 +10,38 @@ def test_checksum_known_value() -> None:
 
 
 def test_bitmask_bytes_encoding() -> None:
-    """Test bitmask_bytes_le function."""
+    """Test encode_bitmask_le function."""
     partitions = [1, 2, 29]
-    result = bitmask_bytes_le(partitions, 4)
+    result = encode_bitmask_le(partitions, 4)
 
     assert isinstance(result, bytes)
     assert result == bytearray([0x03, 0x00, 0x00, 0x10])
+
+
+def test_bitmask_bytes_decoding() -> None:
+    """Test bitmask_bytes_le function."""
+    data = bytearray(
+        [
+            0x04,
+            0x20,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x80,
+        ]
+    )
+
+    result = decode_bitmask_le(data, 16)
+
+    assert isinstance(result, list)
+    assert result == [3, 14, 128]

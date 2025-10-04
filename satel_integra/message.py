@@ -3,7 +3,7 @@
 import logging
 
 from satel_integra.command import SatelBaseCommand, SatelReadCommand, SatelWriteCommand
-from satel_integra.utils import bitmask_bytes_le, checksum
+from satel_integra.utils import checksum, decode_bitmask_le, encode_bitmask_le
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,9 +37,9 @@ class SatelWriteMessage(SatelBaseMessage):
             if code:
                 msg_data += bytearray.fromhex(code.ljust(16, "F"))
             if partitions:
-                msg_data += bitmask_bytes_le(partitions, 4)
+                msg_data += encode_bitmask_le(partitions, 4)
             if outputs:
-                msg_data += bitmask_bytes_le(outputs, 32)
+                msg_data += encode_bitmask_le(outputs, 32)
 
         super().__init__(cmd, msg_data)
 
@@ -85,3 +85,7 @@ class SatelReadMessage(SatelBaseMessage):
         except ValueError:
             _LOGGER.warning("Unknown command byte: %s", hex(cmd_byte))
             return None
+
+    def get_active_bits(self, expected_length: int) -> list[int]:
+        """Convenience wrapper around decode_bitmask_le() for this message."""
+        return decode_bitmask_le(self.msg_data, expected_length)

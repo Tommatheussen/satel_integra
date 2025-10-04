@@ -12,18 +12,42 @@ def checksum(command: bytes | bytearray) -> int:
     return crc
 
 
-def bitmask_bytes_le(positions: list[int], length: int) -> bytes:
+def encode_bitmask_le(indices: list[int], length: int) -> bytes:
     """Convert a list of bit positions to a fixed-length little-endian byte array.
 
     Used for partitions, zones, outputs, expanders, etc.
     """
     ret_val = 0
-    for pos in positions:
-        if pos < 1 or pos > length * 8:
+    for pos in indices:
+        if pos > length * 8:
             msg = f"Position {pos} out of bounds for length {length}"
             raise IndexError(msg)
         ret_val |= 1 << (pos - 1)
     return ret_val.to_bytes(length, "little")
+
+
+def decode_bitmask_le(data: bytes, expected_length: int) -> list[int]:
+    """Return list of positions of bits set to one in given data.
+
+    This method is used to read e.g. violated zones. They are marked by ones
+    on respective bit positions - as per Satel manual.
+    """
+    if len(data) != expected_length:
+        msg = (
+            f"Invalid bitmask length: expected {expected_length} bytes, got {len(data)}"
+        )
+        raise ValueError(msg)
+
+    set_bit_numbers = []
+    bit_index = 1
+
+    for byte in data[0:]:
+        for i in range(8):
+            if byte & (1 << i):
+                set_bit_numbers.append(bit_index)
+            bit_index += 1
+
+    return set_bit_numbers
 
 
 def value_bytes(value: int, length: int) -> bytes:
