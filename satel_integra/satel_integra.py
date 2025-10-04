@@ -7,6 +7,7 @@ from enum import Enum, unique
 from typing import TYPE_CHECKING
 
 from satel_integra.message import SatelReadMessage, SatelWriteMessage
+from satel_integra.state import AlarmState
 from satel_integra.utils import encode_bitmask_le
 
 from .command import SatelReadCommand, SatelResultCode, SatelWriteCommand
@@ -17,30 +18,13 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-@unique
-class AlarmState(Enum):
-    """Represents status of the alarm."""
-
-    ARMED_MODE0 = 0
-    ARMED_MODE1 = 1
-    ARMED_MODE2 = 2
-    ARMED_MODE3 = 3
-    ARMED_SUPPRESSED = 4
-    ENTRY_TIME = 5
-    EXIT_COUNTDOWN_OVER_10 = 6
-    EXIT_COUNTDOWN_UNDER_10 = 7
-    TRIGGERED = 8
-    TRIGGERED_FIRE = 9
-    DISARMED = 10
-
-
 class AsyncSatel:
     """Asynchronous interface to talk to Satel Integra alarm system."""
 
     def __init__(
         self,
-        host,
-        port,
+        host: str,
+        port: int,
         loop,
         monitored_zones=None,
         monitored_outputs=None,
@@ -76,7 +60,7 @@ class AsyncSatel:
         self._message_handlers: dict[
             SatelReadCommand, Callable[[SatelReadMessage], None]
         ] = {
-            SatelReadCommand.ZONES_VIOLATED: self._zone_violated,
+            SatelReadCommand.ZONES_VIOLATED: self._zones_violated,
             SatelReadCommand.PARTITIONS_ARMED_SUPPRESSED: lambda msg: self._armed(
                 AlarmState.ARMED_SUPPRESSED, msg
             ),
@@ -104,7 +88,7 @@ class AsyncSatel:
             SatelReadCommand.PARTITIONS_FIRE_ALARM: lambda msg: self._armed(
                 AlarmState.TRIGGERED_FIRE, msg
             ),
-            SatelReadCommand.OUTPUTS_STATE: self._output_changed,
+            SatelReadCommand.OUTPUTS_STATE: self._outputs_changed,
             SatelReadCommand.PARTITIONS_ARMED_MODE1: lambda msg: self._armed(
                 AlarmState.ARMED_MODE1, msg
             ),
@@ -136,9 +120,6 @@ class AsyncSatel:
 
     async def start_monitoring(self) -> None:
         """Start monitoring for interesting events."""
-        # TODO: Convert this to enum values
-        # data = generate_query(b"\x7f\x01\xdc\x99\x80\x00\x04\x00\x00\x00\x00\x00\x00")
-
         monitored_commands = [
             SatelReadCommand.ZONES_VIOLATED,
             SatelReadCommand.PARTITIONS_ARMED_MODE0,
@@ -172,7 +153,7 @@ class AsyncSatel:
         if int.from_bytes(resp[1:2]) != SatelResultCode.COMMAND_ACCEPTED:
             _LOGGER.warning("Monitoring not accepted.")
 
-    def _zone_violated(self, msg: SatelReadMessage) -> None:
+    def _zones_violated(self, msg: SatelReadMessage) -> None:
         status = {"zones": {}}
 
         violated_zones = msg.get_active_bits(32)
@@ -188,7 +169,7 @@ class AsyncSatel:
 
         # return status
 
-    def _output_changed(self, msg: SatelReadMessage) -> None:
+    def _outputs_changed(self, msg: SatelReadMessage) -> None:
         """0x17   outputs state 0x17   + 16/32 bytes."""
         status = {"outputs": {}}
 

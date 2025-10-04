@@ -1,8 +1,9 @@
 """Commands and responses for Satel Integra protocol."""
 
-from enum import IntEnum
+from enum import IntEnum, unique
 
 
+@unique
 class SatelResultCode(IntEnum):
     """Result codes returned in the RESULT command."""
 
@@ -21,6 +22,7 @@ class SatelResultCode(IntEnum):
     COMMAND_ACCEPTED = 0xFF
 
 
+@unique
 class SatelBaseCommand(IntEnum):
     """Base class for all Satel commands."""
 
@@ -29,6 +31,7 @@ class SatelBaseCommand(IntEnum):
         return bytearray(self.value.to_bytes(1, "little"))
 
 
+@unique
 class SatelReadCommand(SatelBaseCommand):
     """Read commands supported by Satel Integra protocol."""
 
@@ -47,6 +50,7 @@ class SatelReadCommand(SatelBaseCommand):
     RESULT = 0xEF
 
 
+@unique
 class SatelWriteCommand(SatelBaseCommand):
     """Write commands supported by Satel Integra protocol."""
 
