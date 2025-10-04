@@ -1,4 +1,4 @@
-from satel_integra.utils import checksum
+from satel_integra.utils import bitmask_bytes_le, checksum
 
 
 def test_checksum_known_value() -> None:
@@ -7,3 +7,12 @@ def test_checksum_known_value() -> None:
 
     c = checksum(data[2:-4])  # exclude headers, footers and checksum itself
     assert c == 0x8A9B  # replace with expected known checksum
+
+
+def test_bitmask_bytes_encoding() -> None:
+    """Test bitmask_bytes_le function."""
+    partitions = [1, 2, 29]
+    result = bitmask_bytes_le(partitions, 4)
+
+    assert isinstance(result, bytes)
+    assert result == bytearray([0x03, 0x00, 0x00, 0x10])

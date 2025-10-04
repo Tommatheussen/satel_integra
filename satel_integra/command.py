@@ -24,20 +24,8 @@ class SatelResultCode(IntEnum):
 class SatelBaseCommand(IntEnum):
     """Base class for all Satel commands."""
 
-    @classmethod
-    def from_value(cls, value: int) -> "SatelBaseCommand":
-        """
-        Tries to resolve a command value by searching all subclasses.
-        Raises ValueError if no match is found.
-        """
-        for subclass in cls.__subclasses__():
-            try:
-                return subclass(value)
-            except ValueError:
-                continue
-        raise ValueError(f"Unknown command value: 0x{value:02X}")
-
     def to_bytearray(self) -> bytearray:
+        """Return command as single-byte bytearray."""
         return bytearray(self.value.to_bytes(1, "little"))
 
 

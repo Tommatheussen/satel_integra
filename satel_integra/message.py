@@ -1,6 +1,9 @@
+"""Message classes for communication with Satel Integra panel."""
+
 import logging
+
 from satel_integra.command import SatelBaseCommand, SatelReadCommand, SatelWriteCommand
-from .utils import bitmask_bytes_le, checksum
+from satel_integra.utils import bitmask_bytes_le, checksum
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -8,11 +11,11 @@ _LOGGER = logging.getLogger(__name__)
 class SatelBaseMessage:
     """Base class shared by read/write message types."""
 
-    def __init__(self, cmd: SatelBaseCommand, msg_data: bytearray):
+    def __init__(self, cmd: SatelBaseCommand, msg_data: bytearray) -> None:
         self.cmd = cmd
         self.msg_data = msg_data
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"SatelMessage({self.cmd.name}, {self.msg_data.hex()})"
 
 
@@ -26,7 +29,7 @@ class SatelWriteMessage(SatelBaseMessage):
         partitions: list[int] | None = None,
         outputs: list[int] | None = None,
         raw_data: bytearray | None = None,
-    ):
+    ) -> None:
         if raw_data is not None:
             msg_data = raw_data
         else:
@@ -54,7 +57,11 @@ class SatelReadMessage(SatelBaseMessage):
     """Message representing data received from the panel."""
 
     @staticmethod
-    def decode_frame(resp: bytes):
+    def decode_frame(
+        resp: bytes,
+    ) -> (
+        "SatelReadMessage | None"
+    ):  # TODO: Verify this type, no sure if we should return None??
         """Verify checksum and strip header/footer of received frame."""
         if resp[0:2] != b"\xfe\xfe":
             _LOGGER.error("Bad header: %s", resp.hex())
@@ -68,9 +75,8 @@ class SatelReadMessage(SatelBaseMessage):
         received_sum = (output[-2] << 8) | output[-1]
 
         if received_sum != calc_sum:
-            raise ValueError(
-                f"Checksum mismatch: got {received_sum}, expected {calc_sum}"
-            )
+            msg = f"Checksum mismatch: got {received_sum}, expected {calc_sum}"
+            raise ValueError(msg)
 
         cmd_byte, data = output[0], output[1:-2]
         try:
