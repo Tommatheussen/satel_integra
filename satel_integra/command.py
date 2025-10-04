@@ -62,6 +62,7 @@ class SatelReadCommand(SatelBaseCommand):
 class SatelWriteCommand(SatelBaseCommand):
     """Write commands supported by Satel Integra protocol."""
 
+    START_MONITORING = 0x7F
     PARTITIONS_ARM_MODE_0 = 0x80
     PARTITIONS_ARM_MODE_1 = 0x81
     PARTITIONS_ARM_MODE_2 = 0x82
@@ -84,5 +85,4 @@ class SatelWriteCommand(SatelBaseCommand):
     # CMD_ZONE_BYPASS = (0x86, True)
     # CMD_OPEN_DOOR = (0x8A, True)
     # CMD_READ_ZONE_TEMP = (0x7D,)
-    # CMD_START_MONITORING = (0x7F, True)
     # CMD_DEVICE_INFO = (0xEE,)
