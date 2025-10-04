@@ -1,0 +1,9 @@
+from satel_integra.utils import checksum
+
+
+def test_checksum_known_value() -> None:
+    """Test checksum calculation against known value from manual."""
+    data = bytearray([0xFE, 0xFE, 0xE0, 0x12, 0x34, 0xFF, 0xFF, 0x8A, 0x9B, 0xFE, 0x0D])
+
+    c = checksum(data[2:-4])  # exclude headers, footers and checksum itself
+    assert c == 0x8A9B  # replace with expected known checksum

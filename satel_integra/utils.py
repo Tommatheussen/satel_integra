@@ -1,3 +1,6 @@
+"""Utility functions."""
+
+
 def checksum(command: bytes | bytearray) -> int:
     """Calculate 16-bit checksum for given command."""
     crc = 0x147A
@@ -10,21 +13,22 @@ def checksum(command: bytes | bytearray) -> int:
 
 
 def bitmask_bytes_le(positions: list[int], length: int) -> bytes:
-    """
-    Convert a list of bit positions (1-indexed) to a fixed-length little-endian byte array.
+    """Convert a list of bit positions to a fixed-length little-endian byte array.
+
     Used for partitions, zones, outputs, expanders, etc.
     """
     ret_val = 0
     for pos in positions:
         if pos < 1 or pos > length * 8:
-            raise IndexError(f"Position {pos} out of bounds for length {length}")
+            msg = f"Position {pos} out of bounds for length {length}"
+            raise IndexError(msg)
         ret_val |= 1 << (pos - 1)
     return ret_val.to_bytes(length, "little")
 
 
 def value_bytes(value: int, length: int) -> bytes:
-    """
-    Convert an integer (or numeric value) to a fixed-length byte array.
+    """Convert an integer (or numeric value) to a fixed-length byte array.
+
     Endianness can be specified ('big' or 'little').
     Used for user codes, time, numeric fields, etc.
     """
