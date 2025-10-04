@@ -21,7 +21,27 @@ class SatelResultCode(IntEnum):
     COMMAND_ACCEPTED = 0xFF
 
 
-class SatelReadCommand(IntEnum):
+class SatelBaseCommand(IntEnum):
+    """Base class for all Satel commands."""
+
+    @classmethod
+    def from_value(cls, value: int) -> "SatelBaseCommand":
+        """
+        Tries to resolve a command value by searching all subclasses.
+        Raises ValueError if no match is found.
+        """
+        for subclass in cls.__subclasses__():
+            try:
+                return subclass(value)
+            except ValueError:
+                continue
+        raise ValueError(f"Unknown command value: 0x{value:02X}")
+
+    def to_bytearray(self) -> bytearray:
+        return bytearray(self.value.to_bytes(1, "little"))
+
+
+class SatelReadCommand(SatelBaseCommand):
     """Read commands supported by Satel Integra protocol."""
 
     ZONES_VIOLATED = 0x00
@@ -39,7 +59,7 @@ class SatelReadCommand(IntEnum):
     RESULT = 0xEF
 
 
-class SatelWriteCommand(IntEnum):
+class SatelWriteCommand(SatelBaseCommand):
     """Write commands supported by Satel Integra protocol."""
 
     PARTITIONS_ARM_MODE_0 = 0x80
