@@ -30,6 +30,9 @@ class SatelBaseCommand(IntEnum):
         """Return command as single-byte bytearray."""
         return bytearray(self.value.to_bytes(1, "little"))
 
+    def __str__(self) -> str:
+        return self.name
+
 
 @unique
 class SatelReadCommand(SatelBaseCommand):

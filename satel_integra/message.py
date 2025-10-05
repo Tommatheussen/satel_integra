@@ -16,7 +16,7 @@ class SatelBaseMessage:
         self.msg_data = msg_data
 
     def __str__(self) -> str:
-        return f"SatelMessage({self.cmd.name}, {self.msg_data.hex()})"
+        return f"SatelMessage({self.cmd}, {self.msg_data.hex()})"
 
 
 class SatelWriteMessage(SatelBaseMessage):

@@ -26,34 +26,28 @@ class AsyncSatel:
         host: str,
         port: int,
         loop,
-        monitored_zones=None,
-        monitored_outputs=None,
-        partitions=None,
+        monitored_zones: list[int] = [],
+        monitored_outputs: list[int] = [],
+        partitions: list[int] = [],
     ) -> None:
         """Init the Satel alarm data."""
-        if partitions is None:
-            partitions = []
-        if monitored_outputs is None:
-            monitored_outputs = []
-        if monitored_zones is None:
-            monitored_zones = []
         self._host = host
         self._port = port
         self._loop = loop
         self._monitored_zones = monitored_zones
-        self.violated_zones = []
         self._monitored_outputs = monitored_outputs
-        self.violated_outputs = []
-        self.partition_states = {}
+        self._partitions = partitions
+        self.violated_zones: list[int] = []
+        self.violated_outputs: list[int] = []
+        self.partition_states: dict[AlarmState, list[int]] = {}
         self._keep_alive_timeout = 20
         self._reconnection_timeout = 15
-        self._reader = None
-        self._writer = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
         self.closed = False
-        self._alarm_status_callback = None
-        self._zone_changed_callback = None
-        self._output_changed_callback = None
-        self._partitions = partitions
+        self._alarm_status_callback: Callable[[], None] | None = None
+        self._zone_changed_callback: Callable[[dict[int, bool]], None] | None = None
+        self._output_changed_callback: Callable[[dict[int, bool]], None] | None = None
         self._command_status_event = asyncio.Event()
         self._command_status = False
 
@@ -61,35 +55,35 @@ class AsyncSatel:
             SatelReadCommand, Callable[[SatelReadMessage], None]
         ] = {
             SatelReadCommand.ZONES_VIOLATED: self._zones_violated,
-            SatelReadCommand.PARTITIONS_ARMED_SUPPRESSED: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ARMED_SUPPRESSED: lambda msg: self._partitions_armed_state(
                 AlarmState.ARMED_SUPPRESSED, msg
             ),
-            SatelReadCommand.PARTITIONS_ARMED_MODE0: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ARMED_MODE0: lambda msg: self._partitions_armed_state(
                 AlarmState.ARMED_MODE0, msg
             ),
-            SatelReadCommand.PARTITIONS_ARMED_MODE2: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ARMED_MODE2: lambda msg: self._partitions_armed_state(
                 AlarmState.ARMED_MODE2, msg
             ),
-            SatelReadCommand.PARTITIONS_ARMED_MODE3: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ARMED_MODE3: lambda msg: self._partitions_armed_state(
                 AlarmState.ARMED_MODE3, msg
             ),
-            SatelReadCommand.PARTITIONS_ENTRY_TIME: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ENTRY_TIME: lambda msg: self._partitions_armed_state(
                 AlarmState.ENTRY_TIME, msg
             ),
-            SatelReadCommand.PARTITIONS_EXIT_COUNTDOWN_OVER_10: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_EXIT_COUNTDOWN_OVER_10: lambda msg: self._partitions_armed_state(
                 AlarmState.EXIT_COUNTDOWN_OVER_10, msg
             ),
-            SatelReadCommand.PARTITIONS_EXIT_COUNTDOWN_UNDER_10: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_EXIT_COUNTDOWN_UNDER_10: lambda msg: self._partitions_armed_state(
                 AlarmState.EXIT_COUNTDOWN_UNDER_10, msg
             ),
-            SatelReadCommand.PARTITIONS_ALARM: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ALARM: lambda msg: self._partitions_armed_state(
                 AlarmState.TRIGGERED, msg
             ),
-            SatelReadCommand.PARTITIONS_FIRE_ALARM: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_FIRE_ALARM: lambda msg: self._partitions_armed_state(
                 AlarmState.TRIGGERED_FIRE, msg
             ),
             SatelReadCommand.OUTPUTS_STATE: self._outputs_changed,
-            SatelReadCommand.PARTITIONS_ARMED_MODE1: lambda msg: self._armed(
+            SatelReadCommand.PARTITIONS_ARMED_MODE1: lambda msg: self._partitions_armed_state(
                 AlarmState.ARMED_MODE1, msg
             ),
             SatelReadCommand.RESULT: self._command_result,
@@ -154,41 +148,45 @@ class AsyncSatel:
             _LOGGER.warning("Monitoring not accepted.")
 
     def _zones_violated(self, msg: SatelReadMessage) -> None:
-        status = {"zones": {}}
+        """Message handler for zones violated message."""
+        status: dict[int, bool] = {}
 
         violated_zones = msg.get_active_bits(32)
         self.violated_zones = violated_zones
         _LOGGER.debug("Violated zones: %s", violated_zones)
         for zone in self._monitored_zones:
-            status["zones"][zone] = 1 if zone in violated_zones else 0
+            status[zone] = True if zone in violated_zones else False
 
         _LOGGER.debug("Returning status: %s", status)
 
         if self._zone_changed_callback:
             self._zone_changed_callback(status)
 
-        # return status
-
     def _outputs_changed(self, msg: SatelReadMessage) -> None:
-        """0x17   outputs state 0x17   + 16/32 bytes."""
-        status = {"outputs": {}}
+        """Message handler for outputs state message."""
+        status: dict[int, bool] = {}
 
         output_states = msg.get_active_bits(32)
         self.violated_outputs = output_states
-        _LOGGER.debug(
-            "Output states: %s, monitored outputs: %s",
-            output_states,
-            self._monitored_outputs,
-        )
+        _LOGGER.debug("Output states: %s", output_states)
         for output in self._monitored_outputs:
-            status["outputs"][output] = 1 if output in output_states else 0
+            status[output] = True if output in output_states else False
 
         _LOGGER.debug("Returning status: %s", status)
 
         if self._output_changed_callback:
             self._output_changed_callback(status)
 
-        # return status
+    def _partitions_armed_state(self, mode: AlarmState, msg: SatelReadMessage) -> None:
+        """Message handler for partitions armed state messages."""
+        partitions = msg.get_active_bits(4)
+
+        _LOGGER.debug("Partitions in mode %s: %s", mode, partitions)
+
+        self.partition_states[mode] = partitions
+
+        if self._alarm_status_callback:
+            self._alarm_status_callback()
 
     def _command_result(self, msg: SatelReadMessage) -> None:
         status = {"error": "Some problem!"}
@@ -215,8 +213,10 @@ class AsyncSatel:
     #     return self._command_status
 
     async def _send_data(self, msg: SatelWriteMessage) -> bool | None:
+        """Send message to the alarm."""
+        _LOGGER.debug("-- Sending command: %s", msg)
         data = msg.encode_frame()
-        _LOGGER.debug("-- Sending data: %s", data.hex())
+        _LOGGER.debug("-- Sending raw: %s", data.hex())
 
         if not self._writer:
             _LOGGER.warning("Ignoring data because we're disconnected!")
@@ -232,7 +232,7 @@ class AsyncSatel:
 
     async def arm(self, code: str, partition_list: list[int], mode=0) -> None:
         """Send arming command to the alarm. Modes allowed: from 0 till 3."""
-        _LOGGER.debug("Sending arm command, mode: %s!", mode)
+        _LOGGER.info("Sending arm command, mode: %s", mode)
 
         mode_command = SatelWriteCommand(SatelWriteCommand.PARTITIONS_ARM_MODE_0 + mode)
 
@@ -242,7 +242,7 @@ class AsyncSatel:
 
     async def disarm(self, code: str, partition_list: list[int]) -> None:
         """Send command to disarm."""
-        _LOGGER.info("Sending disarm command.")
+        _LOGGER.info("Sending disarm command")
 
         message = SatelWriteMessage(
             SatelWriteCommand.PARTITIONS_DISARM,
@@ -254,7 +254,7 @@ class AsyncSatel:
 
     async def clear_alarm(self, code: str, partition_list: list[int]) -> None:
         """Send command to clear the alarm."""
-        _LOGGER.info("Sending clear the alarm command.")
+        _LOGGER.info("Sending clear the alarm command")
 
         message = SatelWriteMessage(
             SatelWriteCommand.PARTITIONS_CLEAR_ALARM,
@@ -266,12 +266,7 @@ class AsyncSatel:
 
     async def set_output(self, code: str, output_list: list[int], state: bool) -> None:
         """Send output turn on command to the alarm."""
-        """0x88   outputs on
-              + 8 bytes - user code
-              + 16/32 bytes - output list
-              If function is accepted, function result can be
-              checked by observe the system state """
-        _LOGGER.debug("Turn on, output: %s, code: %s", output_list, code)
+        _LOGGER.info("Turn %s, output: %s", "on" if state else "off", output_list)
 
         mode_command = (
             SatelWriteCommand.OUTPUTS_ON if state else SatelWriteCommand.OUTPUTS_OFF
@@ -280,16 +275,6 @@ class AsyncSatel:
         message = SatelWriteMessage(mode_command, code=code, outputs=output_list)
 
         await self._send_data(message)
-
-    def _armed(self, mode: AlarmState, msg: SatelReadMessage) -> None:
-        partitions = msg.get_active_bits(4)
-
-        _LOGGER.debug("Update: list of partitions in mode %s: %s", mode, partitions)
-
-        self.partition_states[mode] = partitions
-
-        if self._alarm_status_callback:
-            self._alarm_status_callback()
 
     async def _read_data(self):
         if not self._reader:
