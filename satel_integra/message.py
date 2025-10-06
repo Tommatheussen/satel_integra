@@ -1,17 +1,27 @@
 """Message classes for communication with Satel Integra panel."""
 
 import logging
+from typing import TypeVar
 
 from satel_integra.command import SatelBaseCommand, SatelReadCommand, SatelWriteCommand
+from satel_integra.const import (
+    FRAME_END,
+    FRAME_RESTRICTED_BYTES,
+    FRAME_RESTRICTED_REPLACEMENT,
+    FRAME_START,
+)
 from satel_integra.utils import checksum, decode_bitmask_le, encode_bitmask_le
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class SatelBaseMessage:
+TCommand = TypeVar("TCommand", bound=SatelBaseCommand)
+
+
+class SatelBaseMessage[TCommand: SatelBaseCommand]:
     """Base class shared by read/write message types."""
 
-    def __init__(self, cmd: SatelBaseCommand, msg_data: bytearray) -> None:
+    def __init__(self, cmd: TCommand, msg_data: bytearray) -> None:
         self.cmd = cmd
         self.msg_data = msg_data
 
@@ -19,7 +29,7 @@ class SatelBaseMessage:
         return f"SatelMessage({self.cmd}, {self.msg_data.hex()})"
 
 
-class SatelWriteMessage(SatelBaseMessage):
+class SatelWriteMessage(SatelBaseMessage[SatelWriteCommand]):
     """Message used to send commands to the panel."""
 
     def __init__(
@@ -49,11 +59,11 @@ class SatelWriteMessage(SatelBaseMessage):
         csum = checksum(data)
         data.append(csum >> 8)
         data.append(csum & 0xFF)
-        data = data.replace(b"\xfe", b"\xfe\xf0")
-        return bytearray.fromhex("FEFE") + data + bytearray.fromhex("FE0D")
+        data = data.replace(FRAME_RESTRICTED_BYTES, FRAME_RESTRICTED_REPLACEMENT)
+        return bytearray(FRAME_START) + data + bytearray(FRAME_END)
 
 
-class SatelReadMessage(SatelBaseMessage):
+class SatelReadMessage(SatelBaseMessage[SatelReadCommand]):
     """Message representing data received from the panel."""
 
     @staticmethod
@@ -63,14 +73,16 @@ class SatelReadMessage(SatelBaseMessage):
         "SatelReadMessage | None"
     ):  # TODO: Verify this type, no sure if we should return None??
         """Verify checksum and strip header/footer of received frame."""
-        if resp[0:2] != b"\xfe\xfe":
+        if resp[0:2] != FRAME_START:
             _LOGGER.error("Bad header: %s", resp.hex())
             raise ValueError("Invalid frame header")
-        if resp[-2:] != b"\xfe\x0d":
+        if resp[-2:] != FRAME_END:
             _LOGGER.error("Bad footer: %s", resp.hex())
             raise ValueError("Invalid frame footer")
 
-        output = resp[2:-2].replace(b"\xfe\xf0", b"\xfe")
+        output = resp[2:-2].replace(
+            FRAME_RESTRICTED_REPLACEMENT, FRAME_RESTRICTED_BYTES
+        )
         calc_sum = checksum(output[:-2])
         received_sum = (output[-2] << 8) | output[-1]
 

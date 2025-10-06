@@ -37,6 +37,7 @@ ignore = [
     "TD003", # Skip for now, TODO: Remove this ignore when we have fixed all issues
     "FIX002", # Skip for now, TODO: Remove this ignore when we have fixed all issues
     "PGH004", # Skip for now, TODO: Remove this ignore when we have fixed all issues
+    "BLE001", # Skip for now, TODO: Remove this ignore when we have fixed all issues
 
     "ANN401", # Opinioated warning on disallowing dynamically typed expressions
     "D203",   # Conflicts with other rules

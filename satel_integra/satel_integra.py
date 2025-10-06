@@ -6,6 +6,7 @@ import logging
 from enum import Enum, unique
 from typing import TYPE_CHECKING
 
+from satel_integra.connection import SatelConnection
 from satel_integra.message import SatelReadMessage, SatelWriteMessage
 from satel_integra.state import AlarmState
 from satel_integra.utils import encode_bitmask_le
@@ -40,11 +41,12 @@ class AsyncSatel:
         self.violated_zones: list[int] = []
         self.violated_outputs: list[int] = []
         self.partition_states: dict[AlarmState, list[int]] = {}
+
+        self._connection = SatelConnection(host, port)
+
         self._keep_alive_timeout = 20
         self._reconnection_timeout = 15
-        self._reader: asyncio.StreamReader | None = None
-        self._writer: asyncio.StreamWriter | None = None
-        self.closed = False
+
         self._alarm_status_callback: Callable[[], None] | None = None
         self._zone_changed_callback: Callable[[dict[int, bool]], None] | None = None
         self._output_changed_callback: Callable[[dict[int, bool]], None] | None = None
@@ -90,27 +92,19 @@ class AsyncSatel:
         }
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
         """Return true if there is connection to the alarm."""
-        return self._writer and self._reader
+        return self._connection.connected
+
+    @property
+    def closed(self) -> bool:
+        """Return true if connection is closed."""
+        return self._connection.closed
 
     async def connect(self) -> bool:
         """Make a TCP connection to the alarm system."""
-        _LOGGER.debug("Connecting...")
 
-        try:
-            self._reader, self._writer = await asyncio.open_connection(
-                self._host, self._port
-            )
-            _LOGGER.debug("success connecting...")
-
-        except Exception as e:
-            _LOGGER.warning("Exception during connecting: %s.", e)
-            self._writer = None
-            self._reader = None
-            return False
-
-        return True
+        return await self._connection.connect()
 
     async def start_monitoring(self) -> None:
         """Start monitoring for interesting events."""
@@ -138,13 +132,13 @@ class AsyncSatel:
         )
 
         await self._send_data(message)
-        resp = await self._read_data()
 
-        if resp is None:
-            _LOGGER.warning("Start monitoring - no data!")
-            return
+        msg = await self._read_data()
 
-        if int.from_bytes(resp[1:2]) != SatelResultCode.COMMAND_ACCEPTED:
+        if msg is None or msg.cmd != SatelResultCode.COMMAND_ACCEPTED:
+            _LOGGER.warning("Monitoring not accepted...")
+            # TODO: Probably throw an error or something
+        else:
             _LOGGER.warning("Monitoring not accepted.")
 
     def _zones_violated(self, msg: SatelReadMessage) -> None:
@@ -212,23 +206,12 @@ class AsyncSatel:
     #         _LOGGER.warning("Timeout waiting for response from Satel!")
     #     return self._command_status
 
-    async def _send_data(self, msg: SatelWriteMessage) -> bool | None:
+    async def _send_data(self, msg: SatelWriteMessage) -> bool:
         """Send message to the alarm."""
-        _LOGGER.debug("-- Sending command: %s", msg)
+        _LOGGER.debug("Sending command: %s", msg)
         data = msg.encode_frame()
-        _LOGGER.debug("-- Sending raw: %s", data.hex())
 
-        if not self._writer:
-            _LOGGER.warning("Ignoring data because we're disconnected!")
-            return None
-        try:
-            self._writer.write(data)
-            await self._writer.drain()
-        except Exception as e:
-            _LOGGER.warning("Exception during sending data: %s.", e)
-            self._writer = None
-            self._reader = None
-            return False
+        return await self._connection.send_frame(data)
 
     async def arm(self, code: str, partition_list: list[int], mode=0) -> None:
         """Send arming command to the alarm. Modes allowed: from 0 till 3."""
@@ -276,24 +259,23 @@ class AsyncSatel:
 
         await self._send_data(message)
 
-    async def _read_data(self):
-        if not self._reader:
-            return []
+    async def _read_data(self) -> SatelReadMessage | None:
+        """Read data from the alarm."""
 
-        try:
-            data = await self._reader.readuntil(b"\xfe\x0d")
-            _LOGGER.debug("-- Received frame %s", data.hex())
-            return data
+        data = await self._connection.read_frame()
 
-        except Exception as e:
-            _LOGGER.warning(
-                "Got exception: %s. Most likely the other side has disconnected!", e
-            )
-            self._writer = None
-            self._reader = None
+        if data is None:
+            _LOGGER.warning("Read data failed, probably disconnected.")
+            return
 
-            if self._alarm_status_callback:
-                self._alarm_status_callback()
+        msg = SatelReadMessage.decode_frame(data)
+
+        if msg and isinstance(msg, SatelReadMessage):
+            _LOGGER.debug("Received command: %s", msg)
+            return msg
+        else:
+            _LOGGER.warning("Failed to decode message!")
+            return
 
     async def keep_alive(self) -> None:
         """A workaround for Satel Integra disconnecting after 25s.
@@ -312,28 +294,16 @@ class AsyncSatel:
     async def _update_status(self) -> None:
         _LOGGER.debug("Wait...")
 
-        resp = await self._read_data()
+        msg = await self._read_data()
 
-        if not resp:
-            _LOGGER.warning("Got empty response. We think it's disconnect.")
-            self._writer = None
-            self._reader = None
-            if self._alarm_status_callback:
-                self._alarm_status_callback()
+        if msg is None:
             return
 
-        msg = SatelReadMessage.decode_frame(resp)
-
-        if msg and isinstance(msg, SatelReadMessage):
-            _LOGGER.debug("Decoded message: %s", msg)
-            if msg.cmd in self._message_handlers and isinstance(
-                msg.cmd, SatelReadCommand
-            ):
-                _LOGGER.info("Calling handler for id: 0x%s", format(msg.cmd, "02x"))
-                self._message_handlers[msg.cmd](msg)
+        if msg.cmd in self._message_handlers:
+            _LOGGER.info("Calling handler for command: %s", msg.cmd)
+            self._message_handlers[msg.cmd](msg)
         else:
-            _LOGGER.warning("Failed to decode message!")
-            return
+            _LOGGER.info("No handler for command: %s", msg.cmd)
 
     async def monitor_status(
         self,
@@ -353,30 +323,18 @@ class AsyncSatel:
         _LOGGER.info("Starting monitor_status loop")
 
         while not self.closed:
-            _LOGGER.debug("Iteration... ")
-            while not self.connected:
-                _LOGGER.info("Not connected, re-connecting... ")
-                await self.connect()
-                if not self.connected:
-                    _LOGGER.warning("Not connected, sleeping for 10s... ")
-                    await asyncio.sleep(self._reconnection_timeout)
-                    continue
+            await self._connection.ensure_connected()
+
             await self.start_monitoring()
-            if not self.connected:
-                _LOGGER.warning("Start monitoring failed, sleeping for 10s...")
-                await asyncio.sleep(self._reconnection_timeout)
-                continue
-            while True:
+
+            while self.connected and not self.closed:
                 await self._update_status()
-                _LOGGER.debug("Got status!")
-                if not self.connected:
-                    _LOGGER.info("Got connection broken, reconnecting!")
-                    break
+
+            await asyncio.sleep(self._reconnection_timeout)
+
         _LOGGER.info("Closed, quit monitoring.")
 
-    def close(self) -> None:
-        """Stop monitoring and close connection."""
-        _LOGGER.debug("Closing...")
-        self.closed = True
-        if self.connected and self._writer:
-            self._writer.close()
+    async def disconnect(self) -> None:
+        """Gracefully disconnect the Satel panel connection."""
+        if self._connection:
+            await self._connection.close()
