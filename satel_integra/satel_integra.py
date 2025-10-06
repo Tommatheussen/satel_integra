@@ -268,14 +268,13 @@ class AsyncSatel:
             _LOGGER.warning("Read data failed, probably disconnected.")
             return
 
-        msg = SatelReadMessage.decode_frame(data)
-
-        if msg and isinstance(msg, SatelReadMessage):
+        try:
+            msg = SatelReadMessage.decode_frame(data)
             _LOGGER.debug("Received command: %s", msg)
             return msg
-        else:
-            _LOGGER.warning("Failed to decode message!")
-            return
+        except ValueError as err:
+            _LOGGER.error("Failed to decode message: %s", err)
+            return None
 
     async def keep_alive(self) -> None:
         """A workaround for Satel Integra disconnecting after 25s.

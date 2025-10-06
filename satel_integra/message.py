@@ -69,9 +69,7 @@ class SatelReadMessage(SatelBaseMessage[SatelReadCommand]):
     @staticmethod
     def decode_frame(
         resp: bytes,
-    ) -> (
-        "SatelReadMessage | None"
-    ):  # TODO: Verify this type, no sure if we should return None??
+    ) -> "SatelReadMessage":
         """Verify checksum and strip header/footer of received frame."""
         if resp[0:2] != FRAME_START:
             _LOGGER.error("Bad header: %s", resp.hex())
@@ -94,9 +92,9 @@ class SatelReadMessage(SatelBaseMessage[SatelReadCommand]):
         try:
             cmd = SatelReadCommand(cmd_byte)
             return SatelReadMessage(cmd, bytearray(data))
-        except ValueError:
+        except ValueError as ex:
             _LOGGER.warning("Unknown command byte: %s", hex(cmd_byte))
-            return None
+            raise ValueError("Unknown command byte") from ex
 
     def get_active_bits(self, expected_length: int) -> list[int]:
         """Convenience wrapper around decode_bitmask_le() for this message."""
