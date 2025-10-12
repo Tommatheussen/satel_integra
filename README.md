@@ -13,6 +13,7 @@ Communication library and basic testing tool for Satel Integra alarm system. Com
 
 ## Installation
 
+
 ```bash
 pip install satel_integra
 ```
