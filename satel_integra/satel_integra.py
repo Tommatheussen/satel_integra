@@ -5,8 +5,11 @@ import logging
 from enum import Enum, unique
 from collections.abc import Callable
 
+from . import handlers  # noqa: F401
+
 from satel_integra.commands import SatelReadCommand, SatelWriteCommand
 from satel_integra.connection import SatelConnection
+from satel_integra.handler_registry import MESSAGE_HANDLERS
 from satel_integra.messages import SatelReadMessage, SatelWriteMessage
 from satel_integra.utils import encode_bitmask_le
 
@@ -218,6 +221,9 @@ class AsyncSatel:
 
         if not msg:
             return
+
+        if handler := MESSAGE_HANDLERS.get(msg.cmd):
+            handler(self, msg)
 
         if msg.cmd in self._message_handlers:
             _LOGGER.info("Calling handler for command: %s", msg.cmd)
