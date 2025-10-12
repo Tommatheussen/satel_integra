@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "satel_integra"
+name = "sat_int_test"
 version = "0.0.0"
 description = "Communication library and basic testing tool for Satel Integra alarm system. Communication via TCP/IP protocol published by SATEL."
 readme = "README.rst"
@@ -39,8 +39,8 @@ dev = [
 
 
 [project.urls]
-Repository="https://github.com/c-soft/satel_integra"
-Changelog="https://github.com/c-soft/satel_integra/blob/master/CHANGELOG.md"
+Repository="https://github.com/Tommatheussen/satel_integra"
+Changelog="https://github.com/Tommatheussen/satel_integra/blob/master/CHANGELOG.md"
 
 [tool.pytest.ini_options]
 timeout = 10
