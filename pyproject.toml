@@ -46,4 +46,4 @@ Changelog="https://github.com/Tommatheussen/satel_integra/blob/master/CHANGELOG.
 timeout = 10
 addopts = "--cov --cov-report html"
 
-[tool.setuptools-scm]
+[tool.setuptools_scm]
