@@ -1,3 +1,9 @@
+## 0.0.2 - 2025-10-13
+
+### What’s Changed
+
+* No changes
+
 ## tag_2 - 2025-10-12
 
 ### What’s Changed
