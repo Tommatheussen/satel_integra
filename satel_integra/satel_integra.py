@@ -238,7 +238,11 @@ class AsyncSatel:
                 if not msg:
                     continue
 
-                self._queue.on_message_received(msg)
+                # Only notify queue of command responses
+                if msg.cmd == SatelReadCommand.RESULT or getattr(
+                    msg.cmd, "expects_same_cmd_response", False
+                ):
+                    self._queue.on_message_received(msg)
 
                 if msg.cmd in self._message_handlers:
                     _LOGGER.debug("Calling handler for command: %s", msg.cmd)
