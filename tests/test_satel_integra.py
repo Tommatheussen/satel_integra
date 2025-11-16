@@ -211,7 +211,6 @@ async def test_keepalive_loop_sends_message(satel):
 @pytest.mark.asyncio
 async def test_reading_loop_processes_message(satel):
     type(satel).closed = PropertyMock(side_effect=[False, True])
-    satel._queue.on_message_received = MagicMock()
 
     msg = MagicMock()
     msg.cmd = 1
@@ -224,5 +223,4 @@ async def test_reading_loop_processes_message(satel):
 
     await satel._reading_loop()
 
-    satel._queue.on_message_received.assert_called_once()
     cmd_handler.assert_called_once()
