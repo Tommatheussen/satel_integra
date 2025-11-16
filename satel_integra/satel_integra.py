@@ -200,17 +200,17 @@ class AsyncSatel:
         """Start the client, including queue, reading loop and keepalive."""
         await self._connection.ensure_connected()
 
-        await self._queue.start()
-
-        # Start background loops
+        # Start reading loop first to ensure we don't miss any messages
         if not self._reading_task or self._reading_task.done():
             self._reading_task = asyncio.create_task(self._reading_loop())
 
-        if not self._keepalive_task or self._keepalive_task.done():
-            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
+        await self._queue.start()
 
         if enable_monitoring:
             await self.start_monitoring()
+
+        if not self._keepalive_task or self._keepalive_task.done():
+            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
 
     async def _keepalive_loop(self):
         """A workaround for Satel Integra disconnecting after 25s.
