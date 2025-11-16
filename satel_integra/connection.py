@@ -31,6 +31,8 @@ class SatelConnection:
             else SatelPlainTransport(host, port)
         )
 
+        self._connection_lock = asyncio.Lock()  # Prevent concurrent connect/close
+
     @property
     def connected(self) -> bool:
         """Return True if connected to the panel."""
@@ -41,15 +43,20 @@ class SatelConnection:
         """Return True if the connection is closed."""
         return self._connection.closed
 
-    async def connect(self) -> bool:
-        """Establish TCP connection."""
+    async def _connect(self) -> bool:
+        """Establish TCP connection. Must be called with _connection_lock held."""
         if self.closed:
             _LOGGER.debug("Connection is closed, skipping connection")
             return False
 
+        if self.connected:
+            _LOGGER.debug("Already connected, skipping connection")
+            return True
+
         _LOGGER.debug("Connecting to Satel Integra at %s:%s...", self._host, self._port)
 
-        if not await self._connection.connect():
+        await self._connection.connect()
+        if not await self._connection.wait_connected():
             _LOGGER.warning("Unable to establish TCP connection.")
             return False
 
@@ -64,6 +71,19 @@ class SatelConnection:
             _LOGGER.info("Connected to Satel Integra.")
             return True
 
+    async def connect(self) -> bool:
+        """Establish TCP connection with a single attempt (no retries).
+
+        Acquires lock internally. Suitable for setup validation where a single
+        connection failure should not trigger automatic retries.
+        """
+        async with self._connection_lock:
+            if self.closed:
+                return False
+            if self.connected:
+                return True
+            return await self._connect()
+
     async def read_frame(self) -> bytes | None:
         """Read a raw frame from the panel."""
         return await self._connection.read_frame()
@@ -77,22 +97,30 @@ class SatelConnection:
         if self.connected:
             return True
 
-        while not self.connected and not self.closed:
+        if self.closed:
+            return False
+
+        async with self._connection_lock:
+            # Double-check after acquiring lock
+            if self.connected:
+                return True
+
             _LOGGER.debug("Not connected, attempting reconnection...")
-            success = await self.connect()
+            success = await self._connect()
             if not success:
                 _LOGGER.warning(
                     "Connection failed, retrying in %ss...", self._reconnection_timeout
                 )
                 await asyncio.sleep(self._reconnection_timeout)
 
-        return self.connected
+            return self.connected
 
     async def close(self) -> None:
         """Close the connection gracefully and clean up."""
-        if self.closed or not self.connected:
-            return  # already closed, avoid duplicate calls
+        async with self._connection_lock:
+            if self.closed:
+                return  # already closed, avoid duplicate calls
 
-        _LOGGER.debug("Closing connection...")
-        await self._connection.close()
-        _LOGGER.info("Connection closed cleanly.")
+            _LOGGER.debug("Closing connection...")
+            await self._connection.close()
+            _LOGGER.info("Connection closed cleanly.")
