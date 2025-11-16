@@ -25,7 +25,7 @@ class SatelConnection:
         self._host = host
         self._port = port
         self._reconnection_timeout = reconnection_timeout
-        self._connection: SatelBaseTransport = (
+        self._transport: SatelBaseTransport = (
             SatelEncryptedTransport(host, port, integration_key)
             if integration_key
             else SatelPlainTransport(host, port)
@@ -37,7 +37,7 @@ class SatelConnection:
     @property
     def connected(self) -> bool:
         """Return True if connected to the panel."""
-        return self._connection.connected
+        return self._transport.connected
 
     @property
     def closed(self) -> bool:
@@ -56,16 +56,16 @@ class SatelConnection:
 
         _LOGGER.debug("Connecting to Satel Integra at %s:%s...", self._host, self._port)
 
-        await self._connection.connect()
-        if not await self._connection.wait_connected():
+        await self._transport.connect()
+        if not await self._transport.wait_connected():
             _LOGGER.warning("Unable to establish TCP connection.")
             return False
 
         _LOGGER.debug("TCP connection established, verifying panel responsiveness...")
 
-        if not await self._connection.check_connection():
+        if not await self._transport.check_connection():
             _LOGGER.warning("Panel not responsive or busy.")
-            await self._connection.close()
+            await self._transport.close()
             return False
 
         else:
@@ -87,11 +87,11 @@ class SatelConnection:
 
     async def read_frame(self) -> bytes | None:
         """Read a raw frame from the panel."""
-        return await self._connection.read_frame()
+        return await self._transport.read_frame()
 
     async def send_frame(self, frame: bytes) -> bool:
         """Send a raw frame to the panel."""
-        return await self._connection.send_frame(frame)
+        return await self._transport.send_frame(frame)
 
     async def ensure_connected(self) -> bool:
         """Reconnect automatically if disconnected."""
@@ -123,6 +123,6 @@ class SatelConnection:
                 return  # already closed, avoid duplicate calls
 
             _LOGGER.debug("Closing connection...")
-            await self._connection.close()
+            await self._transport.close()
             self._closed = True
             _LOGGER.info("Connection closed cleanly.")
