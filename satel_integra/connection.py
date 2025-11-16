@@ -31,6 +31,7 @@ class SatelConnection:
             else SatelPlainTransport(host, port)
         )
 
+        self._closed = False
         self._connection_lock = asyncio.Lock()  # Prevent concurrent connect/close
 
     @property
@@ -41,7 +42,7 @@ class SatelConnection:
     @property
     def closed(self) -> bool:
         """Return True if the connection is closed."""
-        return self._connection.closed
+        return self._closed
 
     async def _connect(self) -> bool:
         """Establish TCP connection. Must be called with _connection_lock held."""
@@ -123,4 +124,5 @@ class SatelConnection:
 
             _LOGGER.debug("Closing connection...")
             await self._connection.close()
+            self._closed = True
             _LOGGER.info("Connection closed cleanly.")
