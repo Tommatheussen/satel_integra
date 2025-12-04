@@ -1,47 +1,16 @@
 """Tests for message handlers."""
 
 import logging
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
-import pytest
 
 from satel_integra.commands import SatelReadCommand
-from satel_integra.satel_integra import AlarmState, AsyncSatel
+from satel_integra.satel_integra import AlarmState
 from satel_integra.handlers.zones import zones_violated
 from satel_integra.handlers.outputs import outputs_state
 from satel_integra.handlers.partitions import partitions_armed_state
 from satel_integra.handlers.result import command_result
 from satel_integra.handlers import registry
-
-
-@pytest.fixture
-def mock_queue():
-    """A simple AsyncMock queue used by many tests."""
-    queue = AsyncMock()
-    return queue
-
-
-@pytest.fixture
-def satel(monkeypatch, mock_connection, mock_queue):
-    # Use the shared fixtures from tests/conftest.py and ensure the
-    # AsyncSatel instance uses the provided mocks.
-    monkeypatch.setattr(
-        "satel_integra.satel_integra.SatelConnection", lambda *a, **kw: mock_connection
-    )
-    monkeypatch.setattr(
-        "satel_integra.satel_integra.SatelMessageQueue", lambda send: mock_queue
-    )
-
-    stl = AsyncSatel(
-        "127.0.0.1",
-        7094,
-        monitored_zones=[1, 2],
-        monitored_outputs=[3, 4],
-        partitions=[1],
-    )
-    stl._connection = mock_connection
-    stl._queue = mock_queue
-    return stl
 
 
 def test_zones_violated_handler(satel):

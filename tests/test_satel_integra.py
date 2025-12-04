@@ -4,43 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 import pytest
 
 from satel_integra.commands import SatelReadCommand
-from satel_integra.satel_integra import AsyncSatel
 from satel_integra.handlers import registry
-
-
-@pytest.fixture
-def mock_connection():
-    conn = AsyncMock()
-    conn.connected = True
-    conn.closed = False
-    return conn
-
-
-@pytest.fixture
-def mock_queue():
-    queue = AsyncMock()
-    return queue
-
-
-@pytest.fixture
-def satel(monkeypatch, mock_connection, mock_queue):
-    monkeypatch.setattr(
-        "satel_integra.satel_integra.SatelConnection", lambda *a, **kw: mock_connection
-    )
-    monkeypatch.setattr(
-        "satel_integra.satel_integra.SatelMessageQueue", lambda send: mock_queue
-    )
-
-    satel = AsyncSatel(
-        "127.0.0.1",
-        7094,
-        monitored_zones=[1, 2],
-        monitored_outputs=[3, 4],
-        partitions=[1],
-    )
-    satel._connection = mock_connection
-    satel._queue = mock_queue
-    return satel
 
 
 @pytest.mark.asyncio
