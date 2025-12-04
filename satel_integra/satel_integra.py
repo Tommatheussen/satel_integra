@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from satel_integra.commands import SatelReadCommand, SatelWriteCommand
 from satel_integra.connection import SatelConnection
+from satel_integra.handlers import registry
 from satel_integra.messages import SatelReadMessage, SatelWriteMessage
 from satel_integra.utils import encode_bitmask_le
 from satel_integra.queue import SatelMessageQueue
@@ -240,9 +241,9 @@ class AsyncSatel:
 
                 self._queue.on_message_received(msg)
 
-                if msg.cmd in self._message_handlers:
+                if handler := registry.get_handler(msg.cmd):
                     _LOGGER.debug("Calling handler for command: %s", msg.cmd)
-                    self._message_handlers[msg.cmd](msg)
+                    handler(self, msg)
                 else:
                     _LOGGER.debug("No handler for command: %s", msg.cmd)
 
