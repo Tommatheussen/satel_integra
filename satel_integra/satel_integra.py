@@ -94,7 +94,6 @@ class AsyncSatel:
             SatelReadCommand.PARTITIONS_FIRE_ALARM: lambda msg: self._partitions_armed_state(
                 AlarmState.TRIGGERED_FIRE, msg
             ),
-            SatelReadCommand.OUTPUTS_STATE: self._outputs_changed,
             SatelReadCommand.PARTITIONS_ARMED_MODE1: lambda msg: self._partitions_armed_state(
                 AlarmState.ARMED_MODE1, msg
             ),
@@ -139,26 +138,6 @@ class AsyncSatel:
             return
 
         _LOGGER.debug("Monitoring started")
-
-    def _outputs_changed(self, msg: SatelReadMessage):
-        """0x17   outputs state 0x17   + 16/32 bytes"""
-
-        status: dict[int, int] = {}
-
-        output_states = msg.get_active_bits(32)
-        self.violated_outputs = output_states
-        _LOGGER.debug(
-            "Output states: %s, monitored outputs: %s",
-            output_states,
-            self._monitored_outputs,
-        )
-        for output in self._monitored_outputs:
-            status[output] = 1 if output in output_states else 0
-
-        _LOGGER.debug("Returning status: %s", status)
-
-        if self._output_changed_callback:
-            self._output_changed_callback(status)
 
     def _command_result(self, msg: SatelReadMessage):
         status = {"error": "Some problem!"}
