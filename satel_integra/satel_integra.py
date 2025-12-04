@@ -67,7 +67,6 @@ class AsyncSatel:
         self._message_handlers: dict[
             SatelReadCommand, Callable[[SatelReadMessage], None]
         ] = {
-            SatelReadCommand.ZONES_VIOLATED: self._zones_violated,
             SatelReadCommand.PARTITIONS_ARMED_SUPPRESSED: lambda msg: self._partitions_armed_state(
                 AlarmState.ARMED_SUPPRESSED, msg
             ),
@@ -140,20 +139,6 @@ class AsyncSatel:
             return
 
         _LOGGER.debug("Monitoring started")
-
-    def _zones_violated(self, msg: SatelReadMessage):
-        status: dict[int, int] = {}
-
-        violated_zones = msg.get_active_bits(32)
-        self.violated_zones = violated_zones
-        _LOGGER.debug("Violated zones: %s", violated_zones)
-        for zone in self._monitored_zones:
-            status[zone] = 1 if zone in violated_zones else 0
-
-        _LOGGER.debug("Returning status: %s", status)
-
-        if self._zone_changed_callback:
-            self._zone_changed_callback(status)
 
     def _outputs_changed(self, msg: SatelReadMessage):
         """0x17   outputs state 0x17   + 16/32 bytes"""
