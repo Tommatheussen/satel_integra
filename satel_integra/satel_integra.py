@@ -7,10 +7,11 @@ from collections.abc import Callable
 from satel_integra.commands import SatelReadCommand, SatelWriteCommand
 from satel_integra.connection import SatelConnection
 from satel_integra.handlers import registry
+from satel_integra.handlers.result import ResultStatus
 from satel_integra.messages import SatelReadMessage, SatelWriteMessage
+from satel_integra.queue import SatelMessageQueue
 from satel_integra.state import AlarmState
 from satel_integra.utils import encode_bitmask_le
-from satel_integra.queue import SatelMessageQueue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,12 +48,6 @@ class AsyncSatel:
         self._zone_changed_callback: Callable[[dict[int, int]], None] | None = None
         self._output_changed_callback: Callable[[dict[int, int]], None] | None = None
 
-        self._message_handlers: dict[
-            SatelReadCommand, Callable[[SatelReadMessage], None]
-        ] = {
-            SatelReadCommand.RESULT: self._command_result,
-        }
-
     async def start_monitoring(self):
         """Start monitoring for interesting events."""
 
@@ -86,22 +81,11 @@ class AsyncSatel:
             _LOGGER.warning("Start monitoring - no data!")
             return
 
-        if monitoring_result.msg_data != b"\xff":
+        if monitoring_result.msg_data[0] != ResultStatus.COMMAND_ACCEPTED:
             _LOGGER.warning("Monitoring not accepted.")
             return
 
         _LOGGER.debug("Monitoring started")
-
-    def _command_result(self, msg: SatelReadMessage):
-        status = {"error": "Some problem!"}
-        error_code = msg.msg_data[0]
-
-        if error_code in [b"\x00", b"\xff"]:
-            status = {"error": "OK"}
-        elif error_code == b"\x01":
-            status = {"error": "User code not found"}
-
-        _LOGGER.debug("Received error status: %s", status)
 
     # region Core logic
     async def start(self, enable_monitoring=True):

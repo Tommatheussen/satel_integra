@@ -1,3 +1,5 @@
+"""Message handlers"""
+
 import importlib
 import pkgutil
 from pathlib import Path

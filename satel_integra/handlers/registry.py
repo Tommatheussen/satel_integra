@@ -1,9 +1,11 @@
-from collections.abc import Callable
+"""Message handler registry"""
+
 import logging
+from collections.abc import Callable
 
 from satel_integra.commands import SatelBaseCommand
 
-_logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 class CommandHandlerRegistry:
@@ -16,12 +18,12 @@ class CommandHandlerRegistry:
 
         def decorator(func: Callable) -> Callable:
             if command_name in self._handlers:
-                _logger.warning(
+                _LOGGER.warning(
                     "Handler for command '%s' already registered, overwriting",
                     command_name,
                 )
             self._handlers[command_name] = func
-            _logger.debug("Registered handler for command: %s", command_name)
+            _LOGGER.debug("Registered handler for command: %s", command_name)
             return func
 
         return decorator

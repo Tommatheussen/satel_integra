@@ -1,17 +1,18 @@
+"""Output message handlers"""
+
 from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
 from satel_integra.commands import SatelReadCommand
 from satel_integra.handlers import registry
 
-from typing import TYPE_CHECKING
-
-
-import logging
+if TYPE_CHECKING:
+    from satel_integra.messages import SatelReadMessage
+    from satel_integra.satel_integra import AsyncSatel
 
 _LOGGER = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from satel_integra.satel_integra import AsyncSatel
-    from satel_integra.messages import SatelReadMessage
 
 
 @registry.register_handler(SatelReadCommand.OUTPUTS_STATE)

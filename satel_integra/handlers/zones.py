@@ -1,18 +1,18 @@
+"""Zone message handlers"""
+
 from __future__ import annotations
-from satel_integra.commands import SatelReadCommand
-from satel_integra.handlers import registry
-from satel_integra.messages import SatelReadMessage
-
-from typing import TYPE_CHECKING
-
 
 import logging
+from typing import TYPE_CHECKING
 
-_LOGGER = logging.getLogger(__name__)
+from satel_integra.commands import SatelReadCommand
+from satel_integra.handlers import registry
 
 if TYPE_CHECKING:
-    from satel_integra.satel_integra import AsyncSatel
     from satel_integra.messages import SatelReadMessage
+    from satel_integra.satel_integra import AsyncSatel
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @registry.register_handler(SatelReadCommand.ZONES_VIOLATED)

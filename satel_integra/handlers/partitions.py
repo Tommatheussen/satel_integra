@@ -1,17 +1,19 @@
 """Partition message handlers"""
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
-from satel_integra.handlers import registry
+
 from satel_integra.commands import SatelReadCommand
+from satel_integra.handlers import registry
 from satel_integra.state import alarm_state_from_command
 
-_LOGGER = logging.getLogger(__name__)
-
-
 if TYPE_CHECKING:
-    from satel_integra.satel_integra import AsyncSatel
     from satel_integra.messages import SatelReadMessage
+    from satel_integra.satel_integra import AsyncSatel
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @registry.register_handler(SatelReadCommand.PARTITIONS_ARMED_SUPPRESSED)
