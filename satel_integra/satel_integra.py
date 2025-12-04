@@ -2,34 +2,17 @@
 
 import asyncio
 import logging
-from enum import Enum, unique
 from collections.abc import Callable
 
 from satel_integra.commands import SatelReadCommand, SatelWriteCommand
 from satel_integra.connection import SatelConnection
 from satel_integra.handlers import registry
 from satel_integra.messages import SatelReadMessage, SatelWriteMessage
+from satel_integra.state import AlarmState
 from satel_integra.utils import encode_bitmask_le
 from satel_integra.queue import SatelMessageQueue
 
 _LOGGER = logging.getLogger(__name__)
-
-
-@unique
-class AlarmState(Enum):
-    """Represents status of the alarm."""
-
-    ARMED_MODE0 = 0
-    ARMED_MODE1 = 1
-    ARMED_MODE2 = 2
-    ARMED_MODE3 = 3
-    ARMED_SUPPRESSED = 4
-    ENTRY_TIME = 5
-    EXIT_COUNTDOWN_OVER_10 = 6
-    EXIT_COUNTDOWN_UNDER_10 = 7
-    TRIGGERED = 8
-    TRIGGERED_FIRE = 9
-    DISARMED = 10
 
 
 class AsyncSatel:
@@ -67,36 +50,6 @@ class AsyncSatel:
         self._message_handlers: dict[
             SatelReadCommand, Callable[[SatelReadMessage], None]
         ] = {
-            SatelReadCommand.PARTITIONS_ARMED_SUPPRESSED: lambda msg: self._partitions_armed_state(
-                AlarmState.ARMED_SUPPRESSED, msg
-            ),
-            SatelReadCommand.PARTITIONS_ARMED_MODE0: lambda msg: self._partitions_armed_state(
-                AlarmState.ARMED_MODE0, msg
-            ),
-            SatelReadCommand.PARTITIONS_ARMED_MODE2: lambda msg: self._partitions_armed_state(
-                AlarmState.ARMED_MODE2, msg
-            ),
-            SatelReadCommand.PARTITIONS_ARMED_MODE3: lambda msg: self._partitions_armed_state(
-                AlarmState.ARMED_MODE3, msg
-            ),
-            SatelReadCommand.PARTITIONS_ENTRY_TIME: lambda msg: self._partitions_armed_state(
-                AlarmState.ENTRY_TIME, msg
-            ),
-            SatelReadCommand.PARTITIONS_EXIT_COUNTDOWN_OVER_10: lambda msg: self._partitions_armed_state(
-                AlarmState.EXIT_COUNTDOWN_OVER_10, msg
-            ),
-            SatelReadCommand.PARTITIONS_EXIT_COUNTDOWN_UNDER_10: lambda msg: self._partitions_armed_state(
-                AlarmState.EXIT_COUNTDOWN_UNDER_10, msg
-            ),
-            SatelReadCommand.PARTITIONS_ALARM: lambda msg: self._partitions_armed_state(
-                AlarmState.TRIGGERED, msg
-            ),
-            SatelReadCommand.PARTITIONS_FIRE_ALARM: lambda msg: self._partitions_armed_state(
-                AlarmState.TRIGGERED_FIRE, msg
-            ),
-            SatelReadCommand.PARTITIONS_ARMED_MODE1: lambda msg: self._partitions_armed_state(
-                AlarmState.ARMED_MODE1, msg
-            ),
             SatelReadCommand.RESULT: self._command_result,
         }
 
@@ -149,16 +102,6 @@ class AsyncSatel:
             status = {"error": "User code not found"}
 
         _LOGGER.debug("Received error status: %s", status)
-
-    def _partitions_armed_state(self, mode: AlarmState, msg: SatelReadMessage):
-        partitions = msg.get_active_bits(4)
-
-        _LOGGER.debug("Update: list of partitions in mode %s: %s", mode, partitions)
-
-        self.partition_states[mode] = partitions
-
-        if self._alarm_status_callback:
-            self._alarm_status_callback()
 
     # region Core logic
     async def start(self, enable_monitoring=True):
