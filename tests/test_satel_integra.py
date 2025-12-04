@@ -1,10 +1,11 @@
 import asyncio
-import logging
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
-from satel_integra.satel_integra import AlarmState, AsyncSatel
+from satel_integra.commands import SatelReadCommand
+from satel_integra.satel_integra import AsyncSatel
+from satel_integra.handlers import registry
 
 
 @pytest.fixture
@@ -62,70 +63,6 @@ async def test_start_monitoring_rejected(satel, mock_queue, caplog):
     await satel.start_monitoring()
 
     assert "Monitoring not accepted" in caplog.text
-
-
-def test_zones_violated_callback(satel):
-    msg = MagicMock()
-    msg.get_active_bits.return_value = [1]
-
-    called = {}
-    satel.register_callbacks(zone_changed_callback=lambda status: called.update(status))
-
-    satel._zones_violated(msg)
-
-    assert called == {1: 1, 2: 0}
-    assert satel.violated_zones == [1]
-
-
-def test_outputs_changed_callback(satel):
-    msg = MagicMock()
-    msg.get_active_bits.return_value = [4]
-
-    called = {}
-    satel.register_callbacks(
-        output_changed_callback=lambda status: called.update(status)
-    )
-
-    satel._outputs_changed(msg)
-
-    assert called == {3: 0, 4: 1}
-    assert satel.violated_outputs == [4]
-
-
-def test_partitions_armed_state_callback(satel):
-    msg = MagicMock()
-    msg.get_active_bits.return_value = [1]
-    called = False
-    satel.register_callbacks(alarm_status_callback=lambda: nonlocal_set(True))
-
-    # helper to mutate closure var
-    def nonlocal_set(val):
-        nonlocal called
-        called = val
-
-    satel._partitions_armed_state(AlarmState.ARMED_MODE0, msg)
-
-    assert satel.partition_states[AlarmState.ARMED_MODE0] == [1]
-    assert called
-
-
-def test_command_result_ok(satel, caplog):
-    msg = MagicMock()
-    msg.msg_data = [b"\xff"]
-
-    with caplog.at_level(logging.DEBUG):
-        satel._command_result(msg)
-
-    assert "OK" in caplog.text
-
-
-def test_command_result_user_code_not_found(satel, caplog):
-    msg = MagicMock()
-    msg.msg_data = [b"\x01"]
-
-    with caplog.at_level(logging.DEBUG):
-        satel._command_result(msg)
-    assert "User code not found" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -214,15 +151,14 @@ async def test_reading_loop_processes_message(satel):
     satel._queue.on_message_received = MagicMock()
 
     msg = MagicMock()
-    msg.cmd = 1
+    msg.cmd = SatelReadCommand.ZONES_VIOLATED
 
     satel._read_data = AsyncMock(side_effect=[msg, None])  # Return one msg then None
 
-    cmd_handler = MagicMock()
-
-    satel._message_handlers = {1: cmd_handler}
+    handler_spy = MagicMock()
+    registry._handlers[SatelReadCommand.ZONES_VIOLATED] = handler_spy
 
     await satel._reading_loop()
 
     satel._queue.on_message_received.assert_called_once()
-    cmd_handler.assert_called_once()
+    handler_spy.assert_called_once_with(satel, msg)
