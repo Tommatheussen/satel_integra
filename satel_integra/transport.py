@@ -25,6 +25,12 @@ class SatelBaseTransport:
         """Return True if connected to the panel."""
         return self._reader is not None and self._writer is not None
 
+    def _reset_connection(self) -> None:
+        """Reset transport connection handles and clear connection event."""
+        self._connection_event.clear()
+        self._reader = None
+        self._writer = None
+
     async def connect(self) -> None:
         """Establish TCP connection."""
         try:
@@ -36,7 +42,7 @@ class SatelBaseTransport:
 
         except Exception as exc:
             _LOGGER.debug("TCP connection failed: %s", exc)
-            await self.close()
+            self._reset_connection()
 
     async def check_connection(self) -> bool:
         """Check if the connection is valid and the panel is responsive."""
@@ -132,8 +138,6 @@ class SatelBaseTransport:
 
     async def close(self) -> None:
         """Close the connection gracefully and clean up."""
-        self._connection_event.clear()
-
         if self._writer and not self._writer.is_closing():
             try:
                 self._writer.close()
@@ -141,8 +145,7 @@ class SatelBaseTransport:
             except Exception as e:
                 _LOGGER.warning("Exception during close: %s", e)
 
-        self._reader = None
-        self._writer = None
+        self._reset_connection()
 
     async def wait_connected(self, timeout: float | None = None) -> bool:
         """Wait until connection is established."""
