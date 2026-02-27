@@ -180,3 +180,35 @@ async def test_wait_reconnected_blocks_and_returns_true(
 
     result = await asyncio.wait_for(waiter, timeout=1.0)
     assert result is True
+
+
+@pytest.mark.asyncio
+async def test_connection_status_callback_called_on_connect(
+    mock_connection, mock_transport
+):
+    callback = MagicMock()
+    mock_connection.set_connection_status_callback(callback)
+
+    type(mock_transport).connected = PropertyMock(side_effect=[False, False, True])
+
+    result = await mock_connection.connect()
+
+    assert result is True
+    callback.assert_called_once_with(True)
+
+
+@pytest.mark.asyncio
+async def test_connection_status_callback_called_on_read_disconnect(
+    mock_connection, mock_transport
+):
+    callback = MagicMock()
+    mock_connection.set_connection_status_callback(callback)
+
+    mock_connection._last_connected_state = True
+    type(mock_transport).connected = PropertyMock(return_value=False)
+    mock_transport.read_frame = AsyncMock(return_value=None)
+
+    result = await mock_connection.read_frame()
+
+    assert result is None
+    callback.assert_called_once_with(False)

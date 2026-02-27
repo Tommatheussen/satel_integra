@@ -12,6 +12,7 @@ def mock_connection():
     conn = AsyncMock()
     conn.connected = True
     conn.closed = False
+    conn.set_connection_status_callback = MagicMock()
     return conn
 
 
@@ -237,3 +238,11 @@ async def test_connect_passes_check_busy_flag(satel, mock_connection):
     await satel.connect(check_busy=False)
 
     mock_connection.connect.assert_awaited_once_with(check_busy=False)
+
+
+def test_register_callbacks_forwards_connection_status_callback(satel, mock_connection):
+    callback = MagicMock()
+
+    satel.register_callbacks(connection_status_changed_callback=callback)
+
+    mock_connection.set_connection_status_callback.assert_called_once_with(callback)
