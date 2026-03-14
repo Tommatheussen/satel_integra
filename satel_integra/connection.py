@@ -3,8 +3,6 @@
 import asyncio
 import logging
 from collections.abc import Callable
-from functools import wraps
-from typing import Any
 
 from satel_integra.transport import (
     SatelBaseTransport,
@@ -13,21 +11,6 @@ from satel_integra.transport import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def notify_connection_state(
-    fn: Callable[..., Any],
-) -> Callable[..., Any]:
-    """Notify connection status callback after connection-touching methods."""
-
-    @wraps(fn)
-    async def wrapper(self, *args, **kwargs):
-        try:
-            return await fn(self, *args, **kwargs)
-        finally:
-            self._notify_connection_status_changed()
-
-    return wrapper
 
 
 class SatelConnection:
@@ -55,8 +38,6 @@ class SatelConnection:
             asyncio.Event()
         )  # Signals when connection is re-established
         self._had_connection = False
-        self._connection_status_callback: Callable[[bool], None] | None = None
-        self._last_connected_state = self.connected
 
     @property
     def connected(self) -> bool:
@@ -68,11 +49,11 @@ class SatelConnection:
         """Return True if the connection is closed."""
         return self._closed
 
-    def set_connection_status_callback(
-        self, callback: Callable[[bool], None] | None
+    def add_connection_state_callback(
+        self, callback: Callable[[], None] | None
     ) -> None:
         """Register callback called when connection status changes."""
-        self._connection_status_callback = callback
+        self._transport.add_connection_state_callback(callback)
 
     def _notify_connection_status_changed(self) -> None:
         """Notify when connected status changes."""
@@ -90,7 +71,6 @@ class SatelConnection:
         except Exception as exc:
             _LOGGER.exception("Error in connection status callback: %s", exc)
 
-    @notify_connection_state
     async def _connect(self, check_busy: bool = True) -> bool:
         """Establish TCP connection. Must be called with _connection_lock held."""
         if self.closed:
@@ -145,12 +125,10 @@ class SatelConnection:
                 return True
             return await self._connect(check_busy=check_busy)
 
-    @notify_connection_state
     async def read_frame(self) -> bytes | None:
         """Read a raw frame from the panel."""
         return await self._transport.read_frame()
 
-    @notify_connection_state
     async def send_frame(self, frame: bytes) -> bool:
         """Send a raw frame to the panel."""
         return await self._transport.send_frame(frame)
@@ -177,7 +155,6 @@ class SatelConnection:
                 await asyncio.sleep(self._reconnection_timeout)
             return self.connected
 
-    @notify_connection_state
     async def close(self) -> None:
         """Close the connection gracefully and clean up."""
         async with self._connection_lock:
