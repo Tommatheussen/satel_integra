@@ -72,6 +72,80 @@ async def test_connect_failure(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_connection_state_callback_called_on_connect(monkeypatch):
+    reader, writer = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(
+        asyncio, "open_connection", AsyncMock(return_value=(reader, writer))
+    )
+    callback = MagicMock()
+
+    transport = SatelBaseTransport("localhost", 1234)
+    transport.set_connection_state_callback(callback)
+
+    await transport.connect()
+
+    callback.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_multiple_connection_state_callbacks(monkeypatch):
+    reader, writer = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(
+        asyncio, "open_connection", AsyncMock(return_value=(reader, writer))
+    )
+    callback1 = MagicMock()
+    callback2 = MagicMock()
+
+    transport = SatelBaseTransport("localhost", 1234)
+    transport.add_connection_state_callback(callback1)
+    transport.add_connection_state_callback(callback2)
+
+    await transport.connect()
+
+    callback1.assert_called_once_with()
+    callback2.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_remove_connection_state_callback(monkeypatch):
+    reader, writer = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(
+        asyncio, "open_connection", AsyncMock(return_value=(reader, writer))
+    )
+    callback1 = MagicMock()
+    callback2 = MagicMock()
+
+    transport = SatelBaseTransport("localhost", 1234)
+    transport.add_connection_state_callback(callback1)
+    transport.add_connection_state_callback(callback2)
+    transport.remove_connection_state_callback(callback1)
+
+    await transport.connect()
+
+    callback1.assert_not_called()
+    callback2.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_set_connection_state_callback_overwrites(monkeypatch):
+    reader, writer = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(
+        asyncio, "open_connection", AsyncMock(return_value=(reader, writer))
+    )
+    callback1 = MagicMock()
+    callback2 = MagicMock()
+
+    transport = SatelBaseTransport("localhost", 1234)
+    transport.add_connection_state_callback(callback1)
+    transport.set_connection_state_callback(callback2)  # Should overwrite
+
+    await transport.connect()
+
+    callback1.assert_not_called()
+    callback2.assert_called_once_with()
+
+
+@pytest.mark.asyncio
 async def test_check_connection_busy_message(mock_transport, caplog):
     mock_transport._reader.read.return_value = (
         b"\x10Busy!\r\n\xd8\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
@@ -187,6 +261,18 @@ async def test_close_success(mock_transport):
     assert mock_transport._reader is None
     assert mock_transport._writer is None
     assert not mock_transport._connection_event.is_set()
+
+
+@pytest.mark.asyncio
+async def test_connection_state_callback_called_on_close(mock_transport):
+    callback = MagicMock()
+    mock_transport.set_connection_state_callback(callback)
+    mock_transport._last_connected_state = True
+    mock_transport._writer.is_closing = MagicMock(return_value=False)
+
+    await mock_transport.close()
+
+    callback.assert_called_once_with()
 
 
 @pytest.mark.asyncio

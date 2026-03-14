@@ -240,9 +240,19 @@ async def test_connect_passes_check_busy_flag(satel, mock_connection):
     mock_connection.connect.assert_awaited_once_with(check_busy=False)
 
 
-def test_register_callbacks_forwards_connection_status_callback(satel, mock_connection):
+def test_add_connection_status_callback_forwards_to_transport(satel, mock_connection):
     callback = MagicMock()
 
-    satel.register_callbacks(connection_status_changed_callback=callback)
+    satel.add_connection_status_callback(callback)
 
-    mock_connection.set_connection_status_callback.assert_called_once_with(callback)
+    mock_connection.add_connection_state_callback.assert_called_once_with(callback)
+
+
+def test_remove_connection_status_callback_forwards_to_transport(
+    satel, mock_connection
+):
+    callback = MagicMock()
+
+    satel.remove_connection_status_callback(callback)
+
+    mock_connection.remove_connection_state_callback.assert_called_once_with(callback)
