@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from enum import Enum, unique
-from collections.abc import Callable
+from collections.abc import Callable, Awaitable
 
 from satel_integra.commands import SatelReadCommand, SatelWriteCommand
 from satel_integra.connection import SatelConnection
@@ -294,7 +294,9 @@ class AsyncSatel:
         if output_changed_callback:
             self._output_changed_callback = output_changed_callback
 
-    def add_connection_status_callback(self, callback: Callable[[], None]) -> None:
+    def add_connection_status_callback(
+        self, callback: Callable[[], Awaitable[None]]
+    ) -> None:
         """Add a callback to be called when connection status changes."""
         self._connection.add_connection_state_callback(callback)
 
