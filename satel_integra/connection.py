@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from collections.abc import Callable, Awaitable
+from collections.abc import Callable
 
 from satel_integra.transport import (
     SatelBaseTransport,
@@ -49,9 +49,7 @@ class SatelConnection:
         """Return True if the connection is closed."""
         return self._closed
 
-    def add_connection_state_callback(
-        self, callback: Callable[[], Awaitable[None]]
-    ) -> None:
+    def add_connection_state_callback(self, callback: Callable[[], None]) -> None:
         """Register callback called when connection status changes."""
         self._transport.add_connection_state_callback(callback)
 
