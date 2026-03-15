@@ -60,9 +60,9 @@ class AsyncSatel:
         self.partition_states: dict[AlarmState, list[int]] = {}
         self._partitions: list[int] = partitions
 
-        self._alarm_status_callback: Callable[[], None] | None = None
-        self._zone_changed_callback: Callable[[dict[int, int]], None] | None = None
-        self._output_changed_callback: Callable[[dict[int, int]], None] | None = None
+        self._alarm_status_callbacks: list[Callable[[], None]] = []
+        self._zone_changed_callbacks: list[Callable[[dict[int, int]], None]] = []
+        self._output_changed_callbacks: list[Callable[[dict[int, int]], None]] = []
 
         self._message_handlers: dict[
             SatelReadCommand, Callable[[SatelReadMessage], None]
@@ -152,8 +152,8 @@ class AsyncSatel:
 
         _LOGGER.debug("Returning status: %s", status)
 
-        if self._zone_changed_callback:
-            self._zone_changed_callback(status)
+        for callback in self._zone_changed_callbacks:
+            callback(status)
 
     def _outputs_changed(self, msg: SatelReadMessage):
         """0x17   outputs state 0x17   + 16/32 bytes"""
@@ -172,8 +172,8 @@ class AsyncSatel:
 
         _LOGGER.debug("Returning status: %s", status)
 
-        if self._output_changed_callback:
-            self._output_changed_callback(status)
+        for callback in self._output_changed_callbacks:
+            callback(status)
 
     def _command_result(self, msg: SatelReadMessage):
         status = {"error": "Some problem!"}
@@ -193,8 +193,8 @@ class AsyncSatel:
 
         self.partition_states[mode] = partitions
 
-        if self._alarm_status_callback:
-            self._alarm_status_callback()
+        for callback in self._alarm_status_callbacks:
+            callback()
 
     # region Core logic
     async def start(self, enable_monitoring=True):
@@ -287,12 +287,32 @@ class AsyncSatel:
         output_changed_callback: Callable[[dict[int, int]], None] | None = None,
     ):
         """Register callback handlers for events."""
+        _LOGGER.warning(
+            "register_callbacks is deprecated and will be removed in a future version. "
+            "Use add_alarm_status_callback, add_zone_changed_callback, or add_output_changed_callback instead."
+        )
         if alarm_status_callback:
-            self._alarm_status_callback = alarm_status_callback
+            self._alarm_status_callbacks = [alarm_status_callback]
         if zone_changed_callback:
-            self._zone_changed_callback = zone_changed_callback
+            self._zone_changed_callbacks = [zone_changed_callback]
         if output_changed_callback:
-            self._output_changed_callback = output_changed_callback
+            self._output_changed_callbacks = [output_changed_callback]
+
+    def add_alarm_status_callback(self, callback: Callable[[], None]) -> None:
+        """Add a callback to be called when alarm status changes."""
+        self._alarm_status_callbacks.append(callback)
+
+    def add_zone_changed_callback(
+        self, callback: Callable[[dict[int, int]], None]
+    ) -> None:
+        """Add a callback to be called when zone status changes."""
+        self._zone_changed_callbacks.append(callback)
+
+    def add_output_changed_callback(
+        self, callback: Callable[[dict[int, int]], None]
+    ) -> None:
+        """Add a callback to be called when output status changes."""
+        self._output_changed_callbacks.append(callback)
 
     def add_connection_status_callback(
         self, callback: Callable[[], Awaitable[None]]
