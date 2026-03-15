@@ -77,7 +77,7 @@ async def test_connection_state_callback_called_on_connect(monkeypatch):
     monkeypatch.setattr(
         asyncio, "open_connection", AsyncMock(return_value=(reader, writer))
     )
-    callback = MagicMock()
+    callback = AsyncMock()
 
     transport = SatelBaseTransport("localhost", 1234)
     transport.add_connection_state_callback(callback)
@@ -93,8 +93,8 @@ async def test_multiple_connection_state_callbacks(monkeypatch):
     monkeypatch.setattr(
         asyncio, "open_connection", AsyncMock(return_value=(reader, writer))
     )
-    callback1 = MagicMock()
-    callback2 = MagicMock()
+    callback1 = AsyncMock()
+    callback2 = AsyncMock()
 
     transport = SatelBaseTransport("localhost", 1234)
     transport.add_connection_state_callback(callback1)
@@ -226,9 +226,8 @@ async def test_close_success(mock_transport):
 
 @pytest.mark.asyncio
 async def test_connection_state_callback_called_on_close(mock_transport):
-    callback = MagicMock()
+    callback = AsyncMock()
     mock_transport.add_connection_state_callback(callback)
-    mock_transport._last_connected_state = True
     mock_transport._writer.is_closing = MagicMock(return_value=False)
 
     await mock_transport.close()

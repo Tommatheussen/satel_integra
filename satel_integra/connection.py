@@ -55,22 +55,6 @@ class SatelConnection:
         """Register callback called when connection status changes."""
         self._transport.add_connection_state_callback(callback)
 
-    def _notify_connection_status_changed(self) -> None:
-        """Notify when connected status changes."""
-        current_state = self.connected
-        if current_state == self._last_connected_state:
-            return
-
-        self._last_connected_state = current_state
-        callback = self._connection_status_callback
-        if callback is None:
-            return
-
-        try:
-            callback(current_state)
-        except Exception as exc:
-            _LOGGER.exception("Error in connection status callback: %s", exc)
-
     async def _connect(self, check_busy: bool = True) -> bool:
         """Establish TCP connection. Must be called with _connection_lock held."""
         if self.closed:
@@ -153,6 +137,7 @@ class SatelConnection:
                     "Connection failed, retrying in %ss...", self._reconnection_timeout
                 )
                 await asyncio.sleep(self._reconnection_timeout)
+
             return self.connected
 
     async def close(self) -> None:

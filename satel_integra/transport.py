@@ -21,7 +21,6 @@ class SatelBaseTransport:
 
         self._connection_event = asyncio.Event()
         self._connection_state_callbacks: list[Callable[[], Awaitable[None]]] = []
-        self._last_connected_state = False
 
     @property
     def connected(self) -> bool:
@@ -34,21 +33,24 @@ class SatelBaseTransport:
         """Add a callback to be called when transport connection status changes."""
         self._connection_state_callbacks.append(callback)
 
-    def _notify_connection_state_changed(self, connected: bool) -> None:
-        """Invoke callback when connection state changes."""
-        if connected == self._last_connected_state:
-            return
+    async def _set_connection_state(self, connected: bool) -> None:
+        """Set the connection event and notify callbacks."""
+        if connected:
+            self._connection_event.set()
+        else:
+            self._connection_event.clear()
+        await self._notify_connection_state_changed()
 
-        self._last_connected_state = connected
+    async def _notify_connection_state_changed(self) -> None:
+        """Invoke callback when connection state changes."""
         for callback in self._connection_state_callbacks:
             await callback()
 
-    def _reset_connection(self) -> None:
+    async def _reset_connection(self) -> None:
         """Reset transport connection handles and clear connection event."""
-        self._connection_event.clear()
         self._reader = None
         self._writer = None
-        self._notify_connection_state_changed(False)
+        await self._set_connection_state(False)
 
     async def connect(self) -> None:
         """Establish TCP connection."""
@@ -57,8 +59,7 @@ class SatelBaseTransport:
                 self._host, self._port
             )
             _LOGGER.debug("TCP connection established to %s:%s", self._host, self._port)
-            self._connection_event.set()
-            self._notify_connection_state_changed(True)
+            await self._set_connection_state(True)
 
         except Exception as exc:
             _LOGGER.debug("TCP connection failed: %s", exc)
@@ -165,7 +166,7 @@ class SatelBaseTransport:
             except Exception as e:
                 _LOGGER.warning("Exception during close: %s", e)
 
-        self._reset_connection()
+        await self._reset_connection()
 
     async def wait_connected(self, timeout: float | None = None) -> bool:
         """Wait until connection is established."""
