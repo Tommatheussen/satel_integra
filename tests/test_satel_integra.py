@@ -70,7 +70,7 @@ def test_zones_violated_callback(satel):
     msg.get_active_bits.return_value = [1]
 
     called = {}
-    satel.register_callbacks(zone_changed_callback=lambda status: called.update(status))
+    satel.add_zone_changed_callback(lambda status: called.update(status))
 
     satel._zones_violated(msg)
 
@@ -83,9 +83,7 @@ def test_outputs_changed_callback(satel):
     msg.get_active_bits.return_value = [4]
 
     called = {}
-    satel.register_callbacks(
-        output_changed_callback=lambda status: called.update(status)
-    )
+    satel.add_output_changed_callback(lambda status: called.update(status))
 
     satel._outputs_changed(msg)
 
@@ -97,7 +95,7 @@ def test_partitions_armed_state_callback(satel):
     msg = MagicMock()
     msg.get_active_bits.return_value = [1]
     called = False
-    satel.register_callbacks(alarm_status_callback=lambda: nonlocal_set(True))
+    satel.add_alarm_status_callback(lambda: nonlocal_set(True))
 
     # helper to mutate closure var
     def nonlocal_set(val):
