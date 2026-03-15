@@ -404,10 +404,6 @@ class AsyncSatel:
             _LOGGER.exception("Error reading data: %s", e)
             return None
 
-        finally:
-            if self._alarm_status_callback:
-                self._alarm_status_callback()
-
     # endregion
 
     # region Connection management
