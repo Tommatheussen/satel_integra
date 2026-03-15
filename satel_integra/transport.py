@@ -60,7 +60,7 @@ class SatelBaseTransport:
 
         except Exception as exc:
             _LOGGER.debug("TCP connection failed: %s", exc)
-            self._reset_connection()
+            await self.close()
 
     async def check_connection(self) -> bool:
         """Check if the connection is valid and the panel is responsive."""
