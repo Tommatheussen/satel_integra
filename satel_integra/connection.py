@@ -67,7 +67,7 @@ class SatelConnection:
 
         if check_busy:
             _LOGGER.debug(
-                "TCP connection established, verifying panel responsiveness..."
+                "TCP connection established, verifying panel responsiveness"
             )
             if not await self._transport.check_connection():
                 _LOGGER.warning("Panel not responsive or busy.")
