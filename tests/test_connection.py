@@ -1,170 +1,182 @@
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from satel_integra.connection import SatelConnection
 
 
-@pytest.mark.asyncio
-async def test_connect_success(monkeypatch):
-    reader, writer = AsyncMock(), AsyncMock()
-    monkeypatch.setattr(
-        asyncio, "open_connection", AsyncMock(return_value=(reader, writer))
-    )
+@pytest.fixture
+def mock_transport():
+    transport = MagicMock()
+    type(transport).closed = PropertyMock(return_value=False)
+    type(transport).connected = PropertyMock(return_value=False)
 
-    conn = SatelConnection("localhost", 1234)
-    assert await conn.connect() is True
-    assert conn.connected
+    transport.connect = AsyncMock(return_value=None)
+    transport.wait_connected = AsyncMock(return_value=True)
+    transport.check_connection = AsyncMock(return_value=True)
+    transport.close = AsyncMock()
 
-
-@pytest.mark.asyncio
-async def test_connect_failure(monkeypatch):
-    monkeypatch.setattr(
-        asyncio, "open_connection", AsyncMock(side_effect=OSError("boom"))
-    )
-    conn = SatelConnection("localhost", 1234)
-    assert await conn.connect() is False
-    assert not conn.connected
+    return transport
 
 
-@pytest.mark.asyncio
-async def test_connect_skipped_when_closed():
-    conn = SatelConnection("localhost", 1234)
-    conn.closed = True
-    assert await conn.connect() is False
+@pytest.fixture
+def mock_connection(mock_transport: AsyncMock) -> SatelConnection:
+    """Fixture that returns a SatelConnection with a patched _transport."""
+    conn = SatelConnection("127.0.0.1", 7094)
+    conn._transport = mock_transport
+    return conn
 
 
 @pytest.mark.asyncio
-async def test_send_frame_success(monkeypatch):
-    writer = MagicMock()
-    writer.write = MagicMock()
-    writer.drain = AsyncMock()
+async def test_connect_success(mock_connection, mock_transport):
+    result = await mock_connection.connect()
+    assert result is True
 
-    conn = SatelConnection("host", 1)
-    conn._writer = writer
-    frame = b"abc"
-    result = await conn.send_frame(frame)
-    assert result
-    writer.write.assert_called_once_with(frame)
-    writer.drain.assert_awaited_once()
+    mock_transport.connect.assert_awaited_once()
+    mock_transport.wait_connected.assert_awaited_once()
+    mock_transport.check_connection.assert_awaited_once()
+    mock_transport.close.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_send_frame_not_connected():
-    conn = SatelConnection("h", 1)
-    result = await conn.send_frame(b"x")
+async def test_connect_config_failure(mock_connection, mock_transport):
+    mock_transport.wait_connected.return_value = False
+
+    result = await mock_connection.connect()
     assert result is False
 
-
-@pytest.mark.asyncio
-async def test_send_frame_failure(monkeypatch):
-    writer = MagicMock()
-    writer.write = MagicMock()
-    writer.drain.side_effect = Exception("fail")
-    conn = SatelConnection("h", 1)
-    conn._writer = writer
-    result = await conn.send_frame(b"x")
-    assert not result
-    assert conn._writer is None
+    mock_transport.connect.assert_awaited_once()
+    mock_transport.wait_connected.assert_awaited_once()
+    mock_transport.check_connection.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_read_frame_success(monkeypatch):
-    from satel_integra.const import FRAME_END
+async def test_connect_device_busy_failure(mock_connection, mock_transport):
+    mock_transport.check_connection.return_value = False
 
-    reader = AsyncMock()
-    reader.readuntil.return_value = b"data" + FRAME_END
-    conn = SatelConnection("h", 1)
-    conn._reader = reader
-    frame = await conn.read_frame()
-    assert frame is not None
-    assert frame.endswith(FRAME_END)
-    reader.readuntil.assert_awaited_once()
+    result = await mock_connection.connect()
+    assert result is False
+
+    mock_transport.check_connection.assert_awaited_once()
+    mock_transport.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_read_frame_not_connected():
-    conn = SatelConnection("h", 1)
-    result = await conn.read_frame()
-    assert result is None
+async def test_connect_skips_busy_check_when_disabled(mock_connection, mock_transport):
+    mock_transport.check_connection.return_value = False
+
+    result = await mock_connection.connect(check_busy=False)
+    assert result is True
+
+    mock_transport.connect.assert_awaited_once()
+    mock_transport.wait_connected.assert_awaited_once()
+    mock_transport.check_connection.assert_not_awaited()
+    mock_transport.close.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_read_frame_failure(monkeypatch):
-    reader = AsyncMock()
-    reader.readuntil.side_effect = Exception("boom")
-    conn = SatelConnection("h", 1)
-    conn._reader = reader
-    conn._writer = AsyncMock()
-    result = await conn.read_frame()
-    assert result is None
-    assert conn._reader is None
-    assert conn._writer is None
+async def test_connect_skipped_when_closed(mock_connection, mock_transport):
+    mock_connection._closed = True
+
+    result = await mock_connection.connect()
+    assert result is False
+
+    mock_transport.connect.assert_not_awaited()
+    mock_transport.check_connection.assert_not_awaited()
+    mock_transport.close.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_read_frame_timeout():
-    conn = SatelConnection("host", 1234)
-    conn._reader = AsyncMock()
-    conn._reader.readuntil.side_effect = asyncio.TimeoutError()
+async def test_ensure_connected_already_connected(mock_connection, mock_transport):
+    type(mock_transport).connected = PropertyMock(return_value=True)
 
-    result = await conn.read_frame()
-    assert result is None
-    assert not conn.connected  # Should disconnect on timeout
+    result = await mock_connection.ensure_connected()
+    assert result is True
 
-
-@pytest.mark.asyncio
-async def test_ensure_connected_already_connected():
-    conn = SatelConnection("h", 1)
-    conn._reader = AsyncMock()
-    conn._writer = AsyncMock()
-    assert await conn.ensure_connected() is True
+    mock_transport.connect.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_ensure_connected_reconnect(monkeypatch):
-    conn = SatelConnection("h", 1, reconnection_timeout=0)
-    calls = 0
+async def test_ensure_connected_reconnect(mock_connection, mock_transport):
+    # Simulate disconnected state first, then connected after retry
+    type(mock_transport).connected = PropertyMock(
+        side_effect=[False, False, False, True, True]
+    )
 
-    async def fake_connect():
-        nonlocal calls
-        calls += 1
-        if calls < 2:
-            return False
-        conn._reader, conn._writer = AsyncMock(), AsyncMock()
-        return True
+    result = await mock_connection.ensure_connected()
 
-    conn.connect = fake_connect
-    result = await conn.ensure_connected()
-    assert result
-    assert calls == 2
+    assert result is True
+    assert mock_transport.connect.await_count >= 1
 
 
 @pytest.mark.asyncio
-async def test_close_success(monkeypatch):
-    writer = MagicMock()
-    writer.is_closing.return_value = False
-    writer.close = MagicMock()
-    writer.wait_closed = AsyncMock()
+async def test_close_success(mock_connection, mock_transport):
+    type(mock_transport).connected = PropertyMock(return_value=True)
 
-    conn = SatelConnection("h", 1)
-    conn._reader, conn._writer = AsyncMock(), writer
+    assert mock_transport.closed is False
+    assert mock_transport.connected is True
 
-    # Verify initial state
-    assert not conn.closed
-    assert conn.connected
+    await mock_connection.close()
 
-    await conn.close()
-
-    assert conn.closed
-    writer.close.assert_called_once()
-    writer.wait_closed.assert_awaited_once()
-
-    assert conn._reader is None
-    assert conn._writer is None
+    mock_transport.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_close_already_closed():
-    conn = SatelConnection("h", 1)
-    conn.closed = True
-    await conn.close()  # should not raise or call anything
+async def test_close_already_closed(mock_connection, mock_transport):
+    mock_connection._closed = True
+
+    await mock_connection.close()  # should not raise or call anything
+
+    mock_transport.close.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reconnection_event_set_on_subsequent_connect(
+    mock_connection, mock_transport
+):
+    """First successful connect should set `_had_connection` but not the event.
+
+    A subsequent successful connect should set the `_reconnected_event` so
+    waiters are notified.
+    """
+    # First connect (initial connection)
+    result = await mock_connection.connect()
+    assert result is True
+
+    # After initial connect, we have had a connection but the reconnection
+    # event should not be set.
+    assert mock_connection._had_connection is True
+    assert mock_connection._reconnected_event.is_set() is False
+
+    # Ensure the event is cleared, then call connect() again to simulate a
+    # subsequent reconnection — the event should be set this time.
+    mock_connection._reconnected_event.clear()
+
+    # Simulate disconnected state at start of second connect
+    type(mock_transport).connected = PropertyMock(return_value=False)
+
+    await mock_connection.connect()
+
+    assert mock_connection._reconnected_event.is_set() is True
+
+
+@pytest.mark.asyncio
+async def test_wait_reconnected_blocks_and_returns_true(
+    mock_connection, mock_transport
+):
+    """`wait_reconnected()` should block until `_reconnected_event` is set
+    and then return True (when not closed).
+    """
+    # Ensure we've had an initial connection so wait_reconnected will wait for
+    # a later reconnection.
+    await mock_connection.connect()
+
+    waiter = asyncio.create_task(mock_connection.wait_reconnected())
+
+    # Give the loop a tick so the waiter can clear the event and start waiting
+    await asyncio.sleep(0)
+
+    # Now signal reconnection and await the waiter result
+    mock_connection._reconnected_event.set()
+
+    result = await asyncio.wait_for(waiter, timeout=1.0)
+    assert result is True
