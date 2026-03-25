@@ -48,14 +48,14 @@ class SatelBaseTransport:
             # Try reading to end of file
             data = await asyncio.wait_for(self._reader.read(-1), timeout=0.1)
 
+            # We assume any other data is fine, but we log it for debugging reasons
+            _LOGGER.debug("Received data after connect: %s", data)
             # Satel returns a string starting with "Busy" when another client is connected
             if b"Busy" in data:
                 _LOGGER.warning("Panel reports busy (another client is connected).")
                 await self.close()
                 return False
 
-            # We assume any other data is fine, but we log it for debugging reasons
-            _LOGGER.debug("Received data after connect: %s", data)
         except asyncio.TimeoutError:
             # Timeout is fine, it means we can actually read data
             pass
