@@ -53,7 +53,7 @@ class SatelConnection:
             _LOGGER.warning("Unable to establish TCP connection.")
             return False
 
-        _LOGGER.debug("TCP connection established, verifying panel responsiveness...")
+        _LOGGER.debug("TCP connection established, verifying panel responsiveness")
 
         if not await self._connection.check_connection():
             _LOGGER.warning("Panel not responsive or busy.")
